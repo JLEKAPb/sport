@@ -127,6 +127,8 @@
           `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>`,
         Play: (s) => 
           `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>`,
+        Pause: (s) =>
+          `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>`,
         X: (s) =>
           `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`,
       };
@@ -575,7 +577,6 @@
       const LogView = ({
         exercise,
         sets,
-        restTime,
         onBack,
         onSave,
         onUpdateSet,
@@ -583,10 +584,9 @@
         onAddSet,
         onAddRestItem,
         onDeleteSet,
-        onSetRest
+        onToggleRestTimer
       }) => {
         const [showRestModal, setShowRestModal] = useState(false);
-        const setCounter = useRef(0);
 
         return (
           <div className="flex flex-col h-screen bg-black fade-in">
@@ -610,20 +610,8 @@
                 <h2 className="text-[10px] font-black uppercase text-gray-500 tracking-widest truncate">
                   {exercise?.name}
                 </h2>
-                <div
-                  className={`text-xl font-black mt-0.5 tabular-nums tracking-tight ${
-                    restTime > 0 ? "text-orange-500" : "text-green-500"
-                  }`}
-                >
-                  {restTime > 0 ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <Icon name="Flame" size={16} />
-                      {Math.floor(restTime / 60)}:
-                      {(restTime % 60).toString().padStart(2, "0")}
-                    </span>
-                  ) : (
-                    "ГОТОВ"
-                  )}
+                <div className="text-xl font-black mt-0.5 tracking-tight text-white">
+                    ТРЕНИРОВКА
                 </div>
               </div>
               <button
@@ -644,20 +632,24 @@
               
               {sets.map((item, idx) => {
                 if (item.type === 'rest') {
+                    const isRunning = item.isRunning;
+                    const timeLeft = item.remaining;
+                    const displayTime = `${Math.floor(timeLeft / 60)}:${(timeLeft % 60).toString().padStart(2, '0')}`;
+                    
                     return (
                         <div key={idx} className="grid grid-cols-12 gap-3 items-center mb-3">
-                            <div className="col-span-12 flex items-center gap-3 bg-[#1A1A1A] p-2 pr-3 rounded-xl border border-dashed border-gray-800">
-                                <div className="w-8 h-8 flex items-center justify-center bg-gray-900 rounded-lg text-gray-500">
-                                    <Icon name="Clock" size={16} />
+                            <div className={`col-span-12 flex items-center gap-3 p-2 pr-3 rounded-xl border transition-all duration-300 ${isRunning ? 'bg-orange-500/10 border-orange-500/30' : 'bg-[#1A1A1A] border-dashed border-gray-800'}`}>
+                                <div className={`w-8 h-8 flex items-center justify-center rounded-lg ${isRunning ? 'bg-orange-500 text-white animate-pulse' : 'bg-gray-900 text-gray-500'}`}>
+                                    <Icon name={isRunning ? "Flame" : "Clock"} size={16} />
                                 </div>
-                                <div className="flex-1 font-black text-sm text-gray-400 uppercase tracking-wider">
-                                    Отдых {Math.floor(item.duration / 60)}:{(item.duration % 60).toString().padStart(2, '0')}
+                                <div className={`flex-1 font-black text-sm uppercase tracking-wider tabular-nums ${isRunning ? 'text-orange-500 text-lg' : 'text-gray-400'}`}>
+                                    {isRunning ? displayTime : `Отдых ${displayTime}`}
                                 </div>
                                 <button 
-                                    onClick={() => onSetRest(item.duration)}
-                                    className="p-2 text-green-500 hover:bg-green-500/10 rounded-lg transition-colors active:scale-95"
+                                    onClick={() => onToggleRestTimer(idx)}
+                                    className={`p-2 rounded-lg transition-colors active:scale-95 ${isRunning ? 'text-orange-500 hover:bg-orange-500/20' : 'text-green-500 hover:bg-green-500/10'}`}
                                 >
-                                    <Icon name="Play" size={18} />
+                                    <Icon name={isRunning ? "Pause" : "Play"} size={18} />
                                 </button>
                                 <button 
                                     onClick={() => onDeleteSet(idx)}
@@ -815,7 +807,6 @@
         const [sets, setSets] = useState([
           { type: 'set', weight: "", reps: "", status: "empty" },
         ]);
-        const [restTime, setRestTime] = useState(0);
         const timerRef = useRef(null);
 
         // Merge initial and custom exercises
@@ -915,16 +906,24 @@
           }
         }, [user]);
 
-        // Timer
+        // Timer Loop
         useEffect(() => {
-          if (restTime > 0)
-            timerRef.current = setInterval(
-              () => setRestTime((p) => p - 1),
-              1000
-            );
-          else clearInterval(timerRef.current);
-          return () => clearInterval(timerRef.current);
-        }, [restTime]);
+            const timer = setInterval(() => {
+                setSets(prevSets => {
+                    const hasRunning = prevSets.some(s => s.type === 'rest' && s.isRunning);
+                    if (!hasRunning) return prevSets;
+
+                    return prevSets.map(s => {
+                        if (s.type === 'rest' && s.isRunning) {
+                            if (s.remaining <= 0) return { ...s, isRunning: false, remaining: 0 };
+                            return { ...s, remaining: s.remaining - 1 };
+                        }
+                        return s;
+                    });
+                });
+            }, 1000);
+            return () => clearInterval(timer);
+        }, []);
 
         // Handlers
         const handleSaveWorkout = async () => {
@@ -969,7 +968,6 @@
             }
           }
           setView("list");
-          setRestTime(0);
         };
 
         const handleSaveExercise = async (newEx) => {
@@ -1119,7 +1117,6 @@
               <LogView
                 exercise={selectedExercise}
                 sets={sets}
-                restTime={restTime}
                 onBack={() => setView("list")}
                 onSave={handleSaveWorkout}
                 onUpdateSet={(i, f, v) => {
@@ -1129,22 +1126,40 @@
                 }}
                 onToggleSet={(i) => {
                   const n = [...sets];
-                  // If it's a rest item, ignore check
                   if (n[i].type === 'rest') return;
                   
                   const d = n[i].status !== "done";
                   n[i].status = d ? "done" : "empty";
+
+                  // Stop other timers to keep focus
+                  n.forEach(s => { if (s.type === 'rest') s.isRunning = false; });
+                  
+                  if (d) {
+                    const nextItem = n[i + 1];
+                    if (nextItem && nextItem.type === 'rest') {
+                        nextItem.isRunning = true;
+                        nextItem.remaining = nextItem.duration; // Reset
+                    }
+                  }
                   setSets(n);
-                  if (d) setRestTime(120); // Default 2 mins on check
                 }}
                 onAddSet={() =>
                   setSets([...sets, { type: 'set', weight: "", reps: "", status: "empty" }])
                 }
-                onAddRestItem={(time) => setSets([...sets, { type: 'rest', duration: time }])}
-                onSetRest={(time) => setRestTime(time)}
+                onAddRestItem={(time) => setSets([...sets, { type: 'rest', duration: time, remaining: time, isRunning: false }])}
                 onDeleteSet={(index) => {
                     const n = sets.filter((_, i) => i !== index);
                     setSets(n);
+                }}
+                onToggleRestTimer={(index) => {
+                    setSets(prev => prev.map((s, i) => {
+                        if (i === index) {
+                            const willRun = !s.isRunning;
+                            return { ...s, isRunning: willRun, remaining: (willRun && s.remaining === 0) ? s.duration : s.remaining };
+                        }
+                        if (s.type === 'rest') return { ...s, isRunning: false };
+                        return s;
+                    }));
                 }}
               />
             )}
