@@ -93,6 +93,17 @@
         background-color: rgba(0, 0, 0, 0.85);
         backdrop-filter: blur(8px);
       }
+      /* Chart Styles */
+      .chart-line {
+        stroke-dasharray: 1000;
+        stroke-dashoffset: 1000;
+        animation: drawLine 1.5s ease-out forwards;
+      }
+      @keyframes drawLine {
+        to {
+          stroke-dashoffset: 0;
+        }
+      }
     </style>
   </head>
   <body>
@@ -107,8 +118,6 @@
           `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>`,
         ChevronLeft: (s) =>
           `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>`,
-        Trophy: (s) =>
-          `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path><path d="M4 22h16"></path><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"></path><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"></path><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"></path></svg>`,
         MoreHorizontal: (s) =>
           `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg>`,
         Check: (s) =>
@@ -136,7 +145,7 @@
       };
 
       const Icon = ({ name, size = 24, className = "" }) => {
-        const svgFunc = ICONS[name];
+        const svgFunc = ICONS[name] || ICONS['Dumbbell'];
         if (!svgFunc) return null;
         return (
           <span
@@ -146,7 +155,168 @@
         );
       };
 
+      // --- HELPERS FOR MOCK DATA ---
+      const generateMockData = () => {
+        const data = [];
+        const exId = 'ex1'; // ONLY Bench Press
+        const now = new Date();
+        
+        // Generate for last 30 days (approx 15 sessions)
+        for (let i = 0; i < 15; i++) { 
+            const daysAgo = 30 - (i * 2); // Spread over 30 days
+            const date = new Date(now);
+            date.setDate(date.getDate() - Math.floor(daysAgo));
+            // Add slight randomness to time to ensure sorting
+            date.setMinutes(date.getMinutes() - i);
+            
+            // Progressive overload logic for Bench Press
+            let baseWeight = 60; 
+            // Increase weight over time, adding some variation
+            let weight = baseWeight + (i * 1.5); 
+            
+            const sets = [];
+            // Generate 3 working sets
+            for(let s=0; s<3; s++) {
+                sets.push({ 
+                    type: 'set', 
+                    weight: Math.floor(weight).toString(), 
+                    reps: (8 + Math.floor(Math.random() * 3)).toString(), // 8-10 reps
+                    status: 'done' 
+                });
+            }
+            
+            data.push({
+                id: `mock-${Date.now()}-${i}`,
+                exerciseId: exId,
+                exerciseName: "Жим грудь", 
+                dateStr: date.toLocaleDateString("ru-RU", { day: "numeric", month: "short" }),
+                timestamp: { seconds: Math.floor(date.getTime() / 1000) },
+                sets: sets
+            });
+        }
+        return data.sort((a,b) => b.timestamp.seconds - a.timestamp.seconds);
+      };
+
       // --- COMPONENTS ---
+
+      const VolumeChart = ({ history }) => {
+        // Prepare Data: Sort by date ASC
+        const data = useMemo(() => {
+            if (!history || history.length === 0) return [];
+            
+            // history is sorted DESC (newest first), reverse to get ASC (oldest first) for chart
+            const reversed = [...history].reverse(); 
+            
+            return reversed.map(entry => {
+                    const volume = entry.sets.reduce((acc, set) => {
+                        if (set.type === 'set' && set.status === 'done') {
+                            const w = parseFloat(set.weight || 0);
+                            const r = parseFloat(set.reps || 0);
+                            return acc + (w * r);
+                        }
+                        return acc;
+                    }, 0);
+                    return {
+                        date: entry.dateStr,
+                        volume: volume
+                    };
+                }).filter(d => d.volume > 0);
+        }, [history]);
+
+        if (data.length < 2) return (
+            <div className="h-40 flex items-center justify-center bg-[#1A1A1A] rounded-2xl border border-gray-900 mb-6">
+                <span className="text-xs font-bold text-gray-600 uppercase">Недостаточно данных для графика</span>
+            </div>
+        );
+
+        const height = 150;
+        const width = 300;
+        const padding = 20;
+        
+        const volumes = data.map(d => d.volume);
+        const maxVol = Math.max(...volumes);
+        const minVol = Math.min(...volumes) * 0.95; // Just a bit below min
+        
+        const points = data.map((d, i) => {
+            const x = padding + (i / (data.length - 1)) * (width - padding * 2);
+            // Safe division check
+            const range = maxVol - minVol;
+            const y = height - padding - ((d.volume - minVol) / (range === 0 ? 1 : range)) * (height - padding * 2);
+            return `${x},${y}`;
+        }).join(' ');
+
+        // Safely access data for labels
+        const first = data[0];
+        const last = data[data.length - 1];
+        const mid = data[Math.floor(data.length/2)];
+        
+        const growth = first.volume > 0 
+            ? Math.round(((last.volume - first.volume)/first.volume)*100) 
+            : 0;
+
+        return (
+            <div className="bg-[#1A1A1A] p-4 rounded-3xl border border-gray-900 mb-6 shadow-2xl relative overflow-hidden">
+                <div className="flex justify-between items-end mb-4 px-1">
+                    <div>
+                        <div className="text-[10px] text-gray-500 font-black uppercase tracking-widest">Объем тренировки</div>
+                        <div className="text-2xl font-black text-white tracking-tight">
+                            {last.volume} <span className="text-sm text-gray-600">кг</span>
+                        </div>
+                    </div>
+                    <div className={`text-[10px] font-bold px-2 py-1 rounded-lg ${growth >= 0 ? 'text-green-500 bg-green-500/10' : 'text-red-500 bg-red-500/10'}`}>
+                        {growth > 0 ? '+' : ''}{growth}%
+                    </div>
+                </div>
+                
+                <div className="relative h-[120px] w-full">
+                    <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full overflow-visible">
+                         {/* Gradient defs */}
+                        <defs>
+                            <linearGradient id="chartGradient" x1="0" x2="0" y1="0" y2="1">
+                                <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.4" />
+                                <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
+                            </linearGradient>
+                        </defs>
+                        
+                        {/* Area fill */}
+                         <path
+                            d={`${points} L ${width - padding},${height} L ${padding},${height} Z`}
+                            fill="url(#chartGradient)"
+                            className="opacity-50"
+                        />
+                        
+                        {/* Line */}
+                        <polyline
+                            fill="none"
+                            stroke="#3b82f6"
+                            strokeWidth="3"
+                            points={points}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="chart-line"
+                        />
+                        
+                        {/* Dots */}
+                        {data.map((d, i) => {
+                             const x = padding + (i / (data.length - 1)) * (width - padding * 2);
+                             const range = maxVol - minVol;
+                             const y = height - padding - ((d.volume - minVol) / (range === 0 ? 1 : range)) * (height - padding * 2);
+                             return (
+                                <circle key={i} cx={x} cy={y} r="3" fill="#000" stroke="white" strokeWidth="2" />
+                             )
+                        })}
+                    </svg>
+                    
+                    {/* X Axis Labels */}
+                    <div className="flex justify-between mt-2 px-1">
+                        <span className="text-[9px] font-bold text-gray-600 uppercase">{first.date}</span>
+                         <span className="text-[9px] font-bold text-gray-600 uppercase">{mid.date}</span>
+                        <span className="text-[9px] font-bold text-gray-600 uppercase">{last.date}</span>
+                    </div>
+                </div>
+            </div>
+        );
+      };
 
       const SwipableItem = ({
         children,
@@ -387,21 +557,7 @@
           () => history.filter((h) => h.exerciseId === exercise?.id),
           [history, exercise]
         );
-        const stats = useMemo(() => {
-          let maxWeight = 0;
-          let max1RM = 0;
-          exHistory.forEach((workout) => {
-            workout.sets.forEach((set) => {
-              const w = parseFloat(set.weight) || 0;
-              const r = parseFloat(set.reps) || 0;
-              if (w > maxWeight) maxWeight = w;
-              const current1RM = r === 1 ? w : w * (1 + r / 30);
-              if (current1RM > max1RM) max1RM = current1RM;
-            });
-          });
-          return { maxWeight: maxWeight.toFixed(0), max1RM: max1RM.toFixed(0) };
-        }, [exHistory]);
-
+        
         return (
           <div className="flex flex-col h-screen bg-black fade-in">
             <div className="p-4 pt-6 flex items-center bg-[#121212] border-b border-gray-900 sticky top-0 z-20">
@@ -415,98 +571,57 @@
                 {exercise?.name}
               </h2>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-6 pb-28">
-              <div className="grid grid-cols-3 gap-3">
-                <div className="bg-[#1A1A1A] p-3 py-4 rounded-2xl flex flex-col items-center border border-gray-900">
-                  <Icon
-                    name="Trophy"
-                    className="text-yellow-500 mb-2"
-                    size={20}
-                  />
-                  <span className="text-[9px] text-gray-500 uppercase font-black tracking-wider">
-                    Максимум
-                  </span>
-                  <span className="text-xl font-black text-white mt-1">
-                    {stats.maxWeight}{" "}
-                    <span className="text-xs text-gray-500">кг</span>
-                  </span>
-                </div>
-                <div className="bg-[#1A1A1A] p-3 py-4 rounded-2xl flex flex-col items-center border border-gray-900">
-                  <Icon
-                    name="Flame"
-                    className="text-orange-500 mb-2"
-                    size={20}
-                  />
-                  <span className="text-[9px] text-gray-500 uppercase font-black tracking-wider">
-                    Рекорд
-                  </span>
-                  <span className="text-xl font-black text-white mt-1">
-                    {stats.max1RM}{" "}
-                    <span className="text-xs text-gray-500">кг</span>
-                  </span>
-                </div>
-                <div className="bg-[#1A1A1A] p-3 py-4 rounded-2xl flex flex-col items-center border border-gray-900">
-                  <Icon
-                    name="Calendar"
-                    className="text-blue-500 mb-2"
-                    size={20}
-                  />
-                  <span className="text-[9px] text-gray-500 uppercase font-black tracking-wider">
-                    Всего
-                  </span>
-                  <span className="text-xl font-black text-white mt-1">
-                    {exHistory.length}
-                  </span>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] px-1 mb-4">
-                  История тренировок
-                </h3>
-                {exHistory.length === 0 ? (
-                  <div className="text-center py-12 flex flex-col items-center gap-3 opacity-50">
-                    <Icon name="Dumbbell" size={40} className="text-gray-700" />
-                    <div className="text-gray-500 text-sm font-bold">
-                      История пока пуста
-                    </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-2 pb-28">
+              
+              {/* GRAPH COMPONENT */}
+              <VolumeChart history={exHistory} />
+
+              <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] px-1 mb-4 mt-6">
+                История тренировок
+              </h3>
+              {exHistory.length === 0 ? (
+                <div className="text-center py-12 flex flex-col items-center gap-3 opacity-50">
+                  <Icon name="Dumbbell" size={40} className="text-gray-700" />
+                  <div className="text-gray-500 text-sm font-bold">
+                    История пока пуста
                   </div>
-                ) : (
-                  exHistory.map((item, idx) => (
-                    <SwipableItem
-                      key={item.id || idx}
-                      id={item.id}
-                      onDelete={onDeleteEntry}
-                      bgClass="bg-[#121212]"
-                    >
-                      <div className="rounded-2xl p-4 border border-gray-900 shadow-sm">
-                        <div className="flex justify-between items-center mb-3">
-                          <span className="font-black text-sm uppercase text-white tracking-wide">
-                            {item.dateStr}
-                          </span>
-                          <span className="text-[9px] bg-blue-500/10 text-blue-500 px-2 py-1 rounded-md font-black tracking-wider uppercase">
-                            Силовая
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-                          {item.sets.map((s, i) => (
-                            <div
-                              key={i}
-                              className="flex justify-between text-sm bg-black/30 p-2 rounded-lg items-center"
-                            >
-                              <span className="text-gray-500 text-xs font-bold">
-                                #{i + 1}
-                              </span>
-                              <span className="font-black text-gray-200 tracking-tight">
-                                {s.weight} кг × {s.reps}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
+                </div>
+              ) : (
+                exHistory.map((item, idx) => (
+                  <SwipableItem
+                    key={item.id || idx}
+                    id={item.id}
+                    onDelete={onDeleteEntry}
+                    bgClass="bg-[#121212]"
+                  >
+                    <div className="rounded-2xl p-4 border border-gray-900 shadow-sm">
+                      <div className="flex justify-between items-center mb-3">
+                        <span className="font-black text-sm uppercase text-white tracking-wide">
+                          {item.dateStr}
+                        </span>
+                        <span className="text-[9px] bg-blue-500/10 text-blue-500 px-2 py-1 rounded-md font-black tracking-wider uppercase">
+                          Силовая
+                        </span>
                       </div>
-                    </SwipableItem>
-                  ))
-                )}
-              </div>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                        {item.sets.filter(s => s.type !== 'rest').map((s, i) => (
+                          <div
+                            key={i}
+                            className="flex justify-between text-sm bg-black/30 p-2 rounded-lg items-center"
+                          >
+                            <span className="text-gray-500 text-xs font-bold">
+                              #{i + 1}
+                            </span>
+                            <span className="font-black text-gray-200 tracking-tight">
+                              {s.weight} кг × {s.reps}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </SwipableItem>
+                ))
+              )}
             </div>
             <div className="p-4 safe-area-bottom absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black via-black to-transparent pt-10 z-20">
               <button
@@ -590,6 +705,14 @@
       }) => {
         const [showRestModal, setShowRestModal] = useState(false);
         let previousSetsDone = true;
+        
+        // --- BUTTON STATE LOGIC ---
+        const lastItem = sets[sets.length - 1];
+        // Can add set if: List empty OR Last item is Rest
+        const canAddSet = sets.length === 0 || (lastItem && lastItem.type === 'rest');
+        // Can add rest if: Last item is Set
+        const canAddRest = lastItem && lastItem.type === 'set';
+
 
         return (
           <div className="flex flex-col h-screen bg-black fade-in">
@@ -728,16 +851,24 @@
               
               <div className="space-y-3 mt-6">
                 <button
-                  onClick={onAddSet}
-                  className="w-full py-4 bg-[#121212] text-gray-400 text-[11px] font-black rounded-2xl border-2 border-dashed border-gray-800 hover:border-gray-700 hover:text-gray-300 transition-colors flex items-center justify-center gap-2 uppercase tracking-widest active:bg-gray-800"
+                  onClick={canAddSet ? onAddSet : null}
+                  className={`w-full py-4 text-[11px] font-black rounded-2xl border-2 border-dashed transition-colors flex items-center justify-center gap-2 uppercase tracking-widest ${
+                      canAddSet 
+                        ? "bg-[#121212] text-gray-400 border-gray-800 hover:border-gray-700 hover:text-gray-300 active:bg-gray-800"
+                        : "bg-[#111] text-gray-700 border-gray-900 cursor-not-allowed opacity-50"
+                  }`}
                 >
                   <Icon name="Plus" size={14} />
                   Добавить подход
                 </button>
                 
                 <button
-                  onClick={() => setShowRestModal(true)}
-                  className="w-full py-4 bg-[#121212] text-gray-400 text-[11px] font-black rounded-2xl border-2 border-dashed border-gray-800 hover:border-gray-700 hover:text-gray-300 transition-colors flex items-center justify-center gap-2 uppercase tracking-widest active:bg-gray-800"
+                  onClick={() => canAddRest && setShowRestModal(true)}
+                  className={`w-full py-4 text-[11px] font-black rounded-2xl border-2 border-dashed transition-colors flex items-center justify-center gap-2 uppercase tracking-widest ${
+                      canAddRest
+                        ? "bg-[#121212] text-gray-400 border-gray-800 hover:border-gray-700 hover:text-gray-300 active:bg-gray-800"
+                        : "bg-[#111] text-gray-700 border-gray-900 cursor-not-allowed opacity-50"
+                  }`}
                 >
                   <Icon name="Clock" size={14} />
                   Добавить отдых
@@ -861,6 +992,14 @@
         useEffect(() => {
           if (!user) return;
 
+          const checkAndSeedMockData = (currentHistory) => {
+             // Mock data generation logic - executed if list is empty
+             if (!currentHistory || currentHistory.length === 0) {
+                 return generateMockData();
+             }
+             return currentHistory;
+          };
+
           if (user.uid !== "local" && window.firebase) {
             const db = firebase.firestore();
             const aid =
@@ -868,17 +1007,15 @@
 
             const unsubHistory = db
               .collection(`/artifacts/${aid}/users/${user.uid}/history`)
-              .onSnapshot((s) =>
-                setHistory(
-                  s.docs
-                    .map((doc) => ({ id: doc.id, ...doc.data() }))
-                    .sort(
-                      (a, b) =>
-                        (b.timestamp?.seconds || 0) -
-                        (a.timestamp?.seconds || 0)
-                    )
-                )
-              );
+              .onSnapshot((s) => {
+                const fetchedHistory = s.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+                // FORCE MOCK DATA IF EMPTY even for Firebase
+                if (fetchedHistory.length === 0) {
+                    setHistory(generateMockData());
+                } else {
+                    setHistory(fetchedHistory.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0)));
+                }
+              });
 
             const unsubCustom = db
               .collection(`/artifacts/${aid}/users/${user.uid}/exercises`)
@@ -904,7 +1041,14 @@
             // Local Storage Fallback
             try {
               const h = localStorage.getItem("fitness_history");
-              if (h) setHistory(JSON.parse(h));
+              let currentHistory = h ? JSON.parse(h) : [];
+              
+              if (currentHistory.length === 0) {
+                 currentHistory = generateMockData();
+                 localStorage.setItem("fitness_history", JSON.stringify(currentHistory));
+              }
+              setHistory(currentHistory);
+
               const e = localStorage.getItem("fitness_custom_exercises");
               if (e) setCustomExercises(JSON.parse(e));
               const hd = localStorage.getItem("fitness_hidden_exercises");
