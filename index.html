@@ -6,7 +6,7 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
     />
-    <title>Fitness Pro</title>
+    <title>Iron Track</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- React and Babel -->
@@ -65,7 +65,7 @@
         overflow: hidden;
         border-radius: 1rem;
       }
-      .swipe-action-bg {
+      .swipe-action-bg-right {
         position: absolute;
         top: 0;
         right: 0;
@@ -80,7 +80,22 @@
         font-size: 0.65rem;
         text-transform: uppercase;
         z-index: 0;
-        transition: opacity 0.1s ease;
+      }
+      .swipe-action-bg-left {
+        position: absolute;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: 100%;
+        background-color: #2563eb;
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        color: white;
+        font-weight: 800;
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        z-index: 0;
       }
       .swipe-content {
         position: relative;
@@ -128,6 +143,8 @@
           `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>`,
         Trash: (s) =>
           `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>`,
+        Edit: (s) =>
+          `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>`,
         Dumbbell: (s) =>
           `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6.5 6.5 11 11"></path><path d="m21 21-1-1"></path><path d="m3 3 1 1"></path><path d="m18 22 4-4"></path><path d="m2 6 4-4"></path><path d="m3 10 7-7"></path><path d="m14 21 7-7"></path></svg>`,
         History: (s) =>
@@ -155,12 +172,10 @@
         );
       };
 
-      // --- HELPERS FOR MOCK DATA ---
+      // --- HELPERS ---
       const generateMockData = () => {
         const data = [];
         const now = new Date();
-        
-        // Configuration for all demo exercises
         const exercises = [
             { id: 'ex1', name: "Жим грудь", base: 60, inc: 1.5 },
             { id: 'ex2', name: "Подтягивание", base: 0, inc: 0 },
@@ -173,31 +188,18 @@
         ];
         
         exercises.forEach(ex => {
-            // Generate for last 30 days (approx 8-12 sessions per exercise)
             const sessionsCount = 8 + Math.floor(Math.random() * 5);
-            
             for (let i = 0; i < sessionsCount; i++) { 
                 const daysAgo = 30 - (i * (30 / sessionsCount)); 
                 const date = new Date(now);
                 date.setDate(date.getDate() - Math.floor(daysAgo));
-                // Add randomness to time to ensure sorting isn't identical
                 date.setMinutes(date.getMinutes() - Math.floor(Math.random() * 100));
-                
-                // Progressive overload logic
                 let weight = ex.base + (i * ex.inc); 
-                if (ex.base === 0 && ex.inc === 0) weight = 0; // Bodyweight
-                
+                if (ex.base === 0 && ex.inc === 0) weight = 0;
                 const sets = [];
-                // Generate 3 working sets
                 for(let s=0; s<3; s++) {
-                    sets.push({ 
-                        type: 'set', 
-                        weight: Math.floor(weight).toString(), 
-                        reps: (8 + Math.floor(Math.random() * 4)).toString(), 
-                        status: 'done' 
-                    });
+                    sets.push({ type: 'set', weight: Math.floor(weight).toString(), reps: (8 + Math.floor(Math.random() * 4)).toString(), status: 'done' });
                 }
-                
                 data.push({
                     id: `mock-${ex.id}-${i}-${Date.now()}`,
                     exerciseId: ex.id,
@@ -208,27 +210,20 @@
                 });
             }
         });
-
         return data.sort((a,b) => b.timestamp.seconds - a.timestamp.seconds);
       };
 
       // --- COMPONENTS ---
 
       const VolumeChart = ({ history }) => {
-        // Prepare Data: Sort by date ASC
         const data = useMemo(() => {
             if (!history || history.length === 0) return [];
-            
-            // history is sorted DESC (newest first), reverse to get ASC (oldest first) for chart
             const reversed = [...history].reverse(); 
-            
             return reversed.map(entry => {
                     const volume = entry.sets.reduce((acc, set) => {
                         if (set.type === 'set' && set.status === 'done') {
                             const w = parseFloat(set.weight || 0);
                             const r = parseFloat(set.reps || 0);
-                            // Ensure 0 weight counts as reps for volume if bodyweight, but typically volume = weight * reps. 
-                            // For bodyweight let's assume weight=1 for viz or just 0
                             return acc + (w > 0 ? w * r : r); 
                         }
                         return acc;
@@ -246,30 +241,34 @@
             </div>
         );
 
-        const height = 150;
+        const height = 150; 
         const width = 300;
         const padding = 20;
         
         const volumes = data.map(d => d.volume);
         const maxVol = Math.max(...volumes);
-        const minVol = Math.min(...volumes) * 0.95; // Just a bit below min
+        const minVol = Math.min(...volumes) * 0.95;
         
         const points = data.map((d, i) => {
             const x = padding + (i / (data.length - 1)) * (width - padding * 2);
-            // Safe division check
             const range = maxVol - minVol;
             const y = height - padding - ((d.volume - minVol) / (range === 0 ? 1 : range)) * (height - padding * 2);
             return `${x},${y}`;
         }).join(' ');
 
-        // Safely access data for labels
         const first = data[0];
         const last = data[data.length - 1];
         const mid = data[Math.floor(data.length/2)];
-        
-        const growth = first.volume > 0 
-            ? Math.round(((last.volume - first.volume)/first.volume)*100) 
-            : 0;
+        const growth = first.volume > 0 ? Math.round(((last.volume - first.volume)/first.volume)*100) : 0;
+
+        const gridVertical = data.map((d, i) => {
+             const x = padding + (i / (data.length - 1)) * (width - padding * 2);
+             return <line key={`v-${i}`} x1={x} y1={padding} x2={x} y2={height - padding} stroke="#333" strokeWidth="0.5" strokeDasharray="2 2" />;
+        });
+        const gridHorizontal = [0, 0.25, 0.5, 0.75, 1].map((ratio, i) => {
+             const y = height - padding - ratio * (height - padding * 2);
+             return <line key={`h-${i}`} x1={padding} y1={y} x2={width - padding} y2={y} stroke="#333" strokeWidth="0.5" strokeDasharray="2 2" />;
+        });
 
         return (
             <div className="bg-[#1A1A1A] p-4 rounded-3xl border border-gray-900 mb-6 shadow-2xl relative overflow-hidden">
@@ -285,62 +284,34 @@
                     </div>
                 </div>
                 
-                <div className="relative h-[120px] w-full">
+                <div className="relative h-[150px] w-full">
                     <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full overflow-visible">
-                         {/* Gradient defs */}
                         <defs>
                             <linearGradient id="chartGradient" x1="0" x2="0" y1="0" y2="1">
                                 <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.4" />
                                 <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
                             </linearGradient>
                         </defs>
-                        
-                        {/* Area fill */}
-                         <path
-                            d={`${points} L ${width - padding},${height} L ${padding},${height} Z`}
-                            fill="url(#chartGradient)"
-                            className="opacity-50"
-                        />
-                        
-                        {/* Line */}
-                        <polyline
-                            fill="none"
-                            stroke="#3b82f6"
-                            strokeWidth="3"
-                            points={points}
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            className="chart-line"
-                        />
-                        
-                        {/* Dots */}
+                        {gridVertical}
+                        {gridHorizontal}
+                        <path d={`${points} L ${width - padding},${height - padding} L ${padding},${height - padding} Z`} fill="url(#chartGradient)" className="opacity-50" />
+                        <polyline fill="none" stroke="#3b82f6" strokeWidth="3" points={points} strokeLinecap="round" strokeLinejoin="round" className="chart-line" />
                         {data.map((d, i) => {
                              const x = padding + (i / (data.length - 1)) * (width - padding * 2);
                              const range = maxVol - minVol;
                              const y = height - padding - ((d.volume - minVol) / (range === 0 ? 1 : range)) * (height - padding * 2);
-                             return (
-                                <circle key={i} cx={x} cy={y} r="3" fill="#000" stroke="white" strokeWidth="2" />
-                             )
+                             return <circle key={i} cx={x} cy={y} r="3" fill="#000" stroke="white" strokeWidth="2" />
                         })}
+                        <text x={padding} y={height - 2} fill="#9ca3af" fontSize="12" fontWeight="bold" textAnchor="start">{first.date}</text>
+                        <text x={width/2} y={height - 2} fill="#9ca3af" fontSize="12" fontWeight="bold" textAnchor="middle">{mid.date}</text>
+                        <text x={width - padding} y={height - 2} fill="#9ca3af" fontSize="12" fontWeight="bold" textAnchor="end">{last.date}</text>
                     </svg>
-                    
-                    {/* X Axis Labels */}
-                    <div className="flex justify-between mt-2 px-1">
-                        <span className="text-[11px] font-bold text-gray-500 uppercase">{first.date}</span>
-                         <span className="text-[11px] font-bold text-gray-500 uppercase">{mid.date}</span>
-                        <span className="text-[11px] font-bold text-gray-500 uppercase">{last.date}</span>
-                    </div>
                 </div>
             </div>
         );
       };
 
-      const SwipableItem = ({
-        children,
-        onDelete,
-        id,
-        bgClass = "bg-[#121212]",
-      }) => {
+      const SwipableItem = ({ children, onDelete, onEdit, id, bgClass = "bg-[#121212]" }) => {
         const [swipeOffset, setSwipeOffset] = useState(0);
         const startX = useRef(0);
         const isDragging = useRef(false);
@@ -357,40 +328,48 @@
           if (!isDragging.current) return;
           const currentX = e.clientX;
           const diff = currentX - startX.current;
+          
+          // Disable edit swipe if no handler, disable delete swipe if no handler
+          if (diff > 0 && !onEdit) return;
+          if (diff < 0 && !onDelete) return;
 
           if (!hasMoved.current && Math.abs(diff) > 10) {
             hasMoved.current = true;
             e.currentTarget.setPointerCapture(e.pointerId);
           }
-
           if (hasMoved.current) {
-            // Only allow swipe left
             if (diff < 0) setSwipeOffset(Math.max(diff, -100));
-            else if (swipeOffset < 0)
-              setSwipeOffset(Math.min(0, diff - deleteThreshold));
+            else if (diff > 0) setSwipeOffset(Math.min(diff, 100)); // Right swipe limit
           }
         };
 
         const onPointerUp = (e) => {
           if (!isDragging.current) return;
           isDragging.current = false;
-
           if (hasMoved.current) {
             e.currentTarget.releasePointerCapture(e.pointerId);
-            if (swipeOffset < -deleteThreshold / 2)
-              setSwipeOffset(-deleteThreshold);
-            else setSwipeOffset(0);
+            if (swipeOffset < -deleteThreshold / 2 && onDelete) {
+                setSwipeOffset(-deleteThreshold);
+            } else if (swipeOffset > deleteThreshold / 2 && onEdit) {
+                 // Trigger edit immediately and reset, or keep open? 
+                 // Standard pattern: Trigger and reset, or show button. 
+                 // Let's show button like delete.
+                 setSwipeOffset(deleteThreshold);
+            } else {
+                setSwipeOffset(0);
+            }
           }
         };
 
         return (
           <div className="swipe-item-container mb-2">
+             {/* Delete Action (Left Swipe -> Shows on Right) */}
             <div
-              className="swipe-action-bg cursor-pointer"
-              style={{ opacity: swipeOffset < 0 ? 1 : 0 }}
+              className="swipe-action-bg-right cursor-pointer"
+              style={{ opacity: swipeOffset < 0 ? 1 : 0, zIndex: 0 }}
               onClick={(e) => {
                 e.stopPropagation();
-                onDelete(id);
+                if(onDelete) onDelete(id);
               }}
             >
               <div className="w-[80px] h-full flex flex-col items-center justify-center gap-1">
@@ -398,6 +377,25 @@
                 <span>Удалить</span>
               </div>
             </div>
+
+            {/* Edit Action (Right Swipe -> Shows on Left) */}
+            <div
+              className="swipe-action-bg-left cursor-pointer"
+              style={{ opacity: swipeOffset > 0 ? 1 : 0, zIndex: 0 }}
+               onClick={(e) => {
+                e.stopPropagation();
+                if(onEdit) {
+                    onEdit(id);
+                    setSwipeOffset(0); // Reset after click
+                }
+              }}
+            >
+              <div className="w-[80px] h-full flex flex-col items-center justify-center gap-1">
+                 <Icon name="Edit" size={18} />
+                <span>Измен.</span>
+              </div>
+            </div>
+
             <div
               className={`swipe-content rounded-2xl ${bgClass}`}
               style={{ transform: `translateX(${swipeOffset}px)` }}
@@ -432,7 +430,7 @@
             <div className="p-6 pt-8 flex justify-between items-center bg-[#121212] border-b border-gray-900 sticky top-0 z-20">
               <div>
                 <h1 className="text-2xl font-black tracking-tight uppercase italic text-white">
-                  Упражнения
+                  Iron Track
                 </h1>
                 <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mt-1">
                   Твой прогресс
@@ -440,7 +438,7 @@
               </div>
               <button
                 onClick={onAddExercise}
-                className="text-blue-500 active:scale-90 transition-transform bg-blue-500/10 p-2 rounded-full"
+                className="text-white active:scale-90 transition-transform bg-blue-600 p-3 rounded-2xl shadow-lg shadow-blue-900/20"
               >
                 <Icon name="Plus" size={24} />
               </button>
@@ -479,7 +477,7 @@
                               className="text-gray-500"
                             />
                             <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wide">
-                              {lastLog.dateStr} • {lastLog.sets.length} подх.
+                              {lastLog.dateStr} • {lastLog.sets.filter(s=>s.type==='set').length} подх.
                             </span>
                           </div>
                         ) : (
@@ -569,6 +567,7 @@
         onBack,
         onStartLog,
         onDeleteEntry,
+        onEditEntry
       }) => {
         const exHistory = useMemo(
           () => history.filter((h) => h.exerciseId === exercise?.id),
@@ -589,8 +588,6 @@
               </h2>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-2 pb-28">
-              
-              {/* GRAPH COMPONENT */}
               <VolumeChart history={exHistory} />
 
               <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] px-1 mb-4 mt-6">
@@ -609,6 +606,7 @@
                     key={item.id || idx}
                     id={item.id}
                     onDelete={onDeleteEntry}
+                    onEdit={() => onEditEntry(item)}
                     bgClass="bg-[#121212]"
                   >
                     <div className="rounded-2xl p-4 border border-gray-900 shadow-sm">
@@ -653,9 +651,20 @@
         );
       };
 
-      const RestModal = ({ isOpen, onConfirm, onClose }) => {
-        const [min, setMin] = useState('03');
-        const [sec, setSec] = useState('00');
+      const RestModal = ({ isOpen, onConfirm, onClose, initialTime }) => {
+        // Parse initial time for editing
+        const initM = initialTime ? Math.floor(initialTime / 60) : 3;
+        const initS = initialTime ? initialTime % 60 : 0;
+        
+        const [min, setMin] = useState(initM.toString().padStart(2,'0'));
+        const [sec, setSec] = useState(initS.toString().padStart(2,'0'));
+
+        useEffect(() => {
+           if(isOpen) {
+               setMin(initM.toString().padStart(2,'0'));
+               setSec(initS.toString().padStart(2,'0'));
+           }
+        }, [isOpen, initialTime]);
 
         if (!isOpen) return null;
 
@@ -694,7 +703,7 @@
                   }}
                   className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black uppercase italic tracking-tight active:scale-95 transition-transform"
                 >
-                  Добавить
+                  {initialTime ? "Изменить" : "Добавить"}
                 </button>
                 <button 
                   onClick={onClose}
@@ -718,27 +727,34 @@
         onAddSet,
         onAddRestItem,
         onDeleteSet,
-        onToggleRestTimer
+        onEditRestItem,
+        existingEntry
       }) => {
         const [showRestModal, setShowRestModal] = useState(false);
+        const [editingRestIndex, setEditingRestIndex] = useState(null);
         let previousSetsDone = true;
         
-        // --- BUTTON STATE LOGIC ---
         const lastItem = sets[sets.length - 1];
-        // Can add set if: List empty OR Last item is Rest
         const canAddSet = sets.length === 0 || (lastItem && lastItem.type === 'rest');
-        // Can add rest if: Last item is Set
         const canAddRest = lastItem && lastItem.type === 'set';
-
 
         return (
           <div className="flex flex-col h-screen bg-black fade-in">
             <RestModal 
               isOpen={showRestModal} 
-              onClose={() => setShowRestModal(false)} 
+              onClose={() => {
+                  setShowRestModal(false);
+                  setEditingRestIndex(null);
+              }}
+              initialTime={editingRestIndex !== null ? sets[editingRestIndex].duration : null}
               onConfirm={(time) => {
-                onAddRestItem(time);
+                if (editingRestIndex !== null) {
+                    onEditRestItem(editingRestIndex, time);
+                } else {
+                    onAddRestItem(time);
+                }
                 setShowRestModal(false);
+                setEditingRestIndex(null);
               }}
             />
             
@@ -754,7 +770,7 @@
                   {exercise?.name}
                 </h2>
                 <div className="text-xl font-black mt-0.5 tracking-tight text-white">
-                    ТРЕНИРОВКА
+                    {existingEntry ? "РЕДАКТИРОВАНИЕ" : "ТРЕНИРОВКА"}
                 </div>
               </div>
               <button
@@ -765,7 +781,7 @@
               </button>
             </div>
             
-            <div className="flex-1 overflow-y-auto p-4 pb-20">
+            <div className="flex-1 overflow-y-auto p-4 pb-48">
               <div className="grid grid-cols-12 gap-3 text-[9px] font-black text-gray-600 uppercase mb-4 px-1 tracking-widest">
                 <div className="col-span-2 text-center">Сет</div>
                 <div className="col-span-4 text-center">Вес (кг)</div>
@@ -776,34 +792,36 @@
               {sets.map((item, idx) => {
                 if (item.type === 'rest') {
                     const isRunning = item.isRunning;
-                    const timeLeft = item.remaining;
-                    const displayTime = `${Math.floor(timeLeft / 60)}:${(timeLeft % 60).toString().padStart(2, '0')}`;
+                    const timeToDisplay = item.elapsed || 0;
+                    const duration = item.duration || 0;
+                    
+                    const elapsedFormatted = `${Math.floor(timeToDisplay / 60)}:${(timeToDisplay % 60).toString().padStart(2, '0')}`;
+                    const durationFormatted = `${Math.floor(duration / 60)}:${(duration % 60).toString().padStart(2, '0')}`;
+                    const displayTime = `${elapsedFormatted} / ${durationFormatted}`;
                     
                     return (
-                        <div key={idx} className="grid grid-cols-12 gap-3 items-center mb-3">
-                            <div className={`col-span-12 flex items-center gap-3 p-2 pr-3 rounded-xl border transition-all duration-300 ${isRunning ? 'bg-orange-500/10 border-orange-500/30' : 'bg-[#1A1A1A] border-dashed border-gray-800'}`}>
-                                <div className={`w-8 h-8 flex items-center justify-center rounded-lg ${isRunning ? 'bg-orange-500 text-white animate-pulse' : 'bg-gray-900 text-gray-500'}`}>
-                                    <Icon name={isRunning ? "Flame" : "Clock"} size={16} />
+                        <SwipableItem
+                            key={idx}
+                            id={idx}
+                            onDelete={onDeleteSet}
+                            onEdit={() => {
+                                setEditingRestIndex(idx);
+                                setShowRestModal(true);
+                            }}
+                            bgClass="bg-black"
+                        >
+                            <div className={`col-span-12 flex flex-col items-center justify-center py-2 rounded-xl border transition-all duration-300 ${isRunning ? 'border-orange-500/30' : 'border-dashed border-gray-800'}`}>
+                                <div className={`font-black text-5xl tabular-nums tracking-tight ${isRunning ? 'text-orange-500' : 'text-gray-400'}`}>
+                                    {displayTime}
                                 </div>
-                                <div className={`flex-1 font-black text-sm uppercase tracking-wider tabular-nums ${isRunning ? 'text-orange-500 text-lg' : 'text-gray-400'} text-center`}>
-                                    {isRunning ? displayTime : `Отдых ${displayTime}`}
-                                </div>
-                                <button 
-                                    onClick={() => onDeleteSet(idx)}
-                                    className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg transition-colors active:scale-95"
-                                >
-                                    <Icon name="X" size={18} />
-                                </button>
                             </div>
-                        </div>
+                        </SwipableItem>
                     );
                 }
                 
-                // Set calculation
                 const setNum = sets.slice(0, idx + 1).filter(i => i.type !== 'rest').length;
                 const isLocked = !previousSetsDone;
                 
-                // Update chain status for next items
                 if (item.status !== 'done') {
                     previousSetsDone = false;
                 }
@@ -865,33 +883,35 @@
                     </div>
                 );
               })}
-              
-              <div className="space-y-3 mt-6">
-                <button
-                  onClick={canAddSet ? onAddSet : null}
-                  className={`w-full py-4 text-[11px] font-black rounded-2xl border-2 border-dashed transition-colors flex items-center justify-center gap-2 uppercase tracking-widest ${
-                      canAddSet 
-                        ? "bg-[#121212] text-gray-400 border-gray-800 hover:border-gray-700 hover:text-gray-300 active:bg-gray-800"
-                        : "bg-[#111] text-gray-700 border-gray-900 cursor-not-allowed opacity-50"
-                  }`}
-                >
-                  <Icon name="Plus" size={14} />
-                  Добавить подход
-                </button>
-                
-                <button
-                  onClick={() => canAddRest && setShowRestModal(true)}
-                  className={`w-full py-4 text-[11px] font-black rounded-2xl border-2 border-dashed transition-colors flex items-center justify-center gap-2 uppercase tracking-widest ${
-                      canAddRest
-                        ? "bg-[#121212] text-gray-400 border-gray-800 hover:border-gray-700 hover:text-gray-300 active:bg-gray-800"
-                        : "bg-[#111] text-gray-700 border-gray-900 cursor-not-allowed opacity-50"
-                  }`}
-                >
-                  <Icon name="Clock" size={14} />
-                  Добавить отдых
-                </button>
               </div>
-            </div>
+              
+              <div className="p-4 safe-area-bottom absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black via-black to-transparent pt-10 z-20">
+                  <div className="space-y-3">
+                    <button
+                      onClick={canAddSet ? onAddSet : null}
+                      className={`w-full py-4 text-[11px] font-black rounded-2xl border-2 border-dashed transition-colors flex items-center justify-center gap-2 uppercase tracking-widest ${
+                          canAddSet 
+                            ? "bg-[#121212] text-gray-400 border-gray-800 hover:border-gray-700 hover:text-gray-300 active:bg-gray-800"
+                            : "bg-[#111] text-gray-700 border-gray-900 cursor-not-allowed opacity-50"
+                      }`}
+                    >
+                      <Icon name="Plus" size={14} />
+                      Добавить подход
+                    </button>
+                    
+                    <button
+                      onClick={() => canAddRest && setShowRestModal(true)}
+                      className={`w-full py-4 text-[11px] font-black rounded-2xl border-2 border-dashed transition-colors flex items-center justify-center gap-2 uppercase tracking-widest ${
+                          canAddRest
+                            ? "bg-[#121212] text-gray-400 border-gray-800 hover:border-gray-700 hover:text-gray-300 active:bg-gray-800"
+                            : "bg-[#111] text-gray-700 border-gray-900 cursor-not-allowed opacity-50"
+                      }`}
+                    >
+                      <Icon name="Clock" size={14} />
+                      Добавить отдых
+                    </button>
+                  </div>
+              </div>
           </div>
         );
       };
@@ -953,7 +973,7 @@
 
       const App = () => {
         const [user, setUser] = useState(null);
-        const [view, setView] = useState("list"); // list, history, log, exercise_form
+        const [view, setView] = useState("list"); 
         const [selectedExercise, setSelectedExercise] = useState(null);
         const [editingExercise, setEditingExercise] = useState(null);
         const [history, setHistory] = useState([]);
@@ -962,9 +982,9 @@
         const [sets, setSets] = useState([
           { type: 'set', weight: "", reps: "", status: "empty" },
         ]);
+        const [editingHistoryEntry, setEditingHistoryEntry] = useState(null); // ID of entry being edited
         const timerRef = useRef(null);
 
-        // Merge initial and custom exercises
         const allExercises = useMemo(() => {
           const baseList = INITIAL_EXERCISES.map((initEx) => {
             const custom = customExercises.find((cex) => cex.id === initEx.id);
@@ -977,7 +997,6 @@
           return combined.filter((ex) => !hiddenExerciseIds.includes(ex.id));
         }, [customExercises, hiddenExerciseIds]);
 
-        // Auth & Init
         useEffect(() => {
           const init = async () => {
             try {
@@ -1005,12 +1024,10 @@
           init();
         }, []);
 
-        // Data Sync
         useEffect(() => {
           if (!user) return;
 
           const checkAndSeedMockData = (currentHistory) => {
-             // Mock data generation logic - executed if list is empty
              if (!currentHistory || currentHistory.length === 0) {
                  return generateMockData();
              }
@@ -1026,7 +1043,6 @@
               .collection(`/artifacts/${aid}/users/${user.uid}/history`)
               .onSnapshot((s) => {
                 const fetchedHistory = s.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-                // FORCE MOCK DATA IF EMPTY even for Firebase
                 if (fetchedHistory.length === 0) {
                     setHistory(generateMockData());
                 } else {
@@ -1055,12 +1071,11 @@
               unsubHidden();
             };
           } else {
-            // Local Storage Fallback
             try {
               const h = localStorage.getItem("fitness_history");
               let currentHistory = h ? JSON.parse(h) : [];
               
-              if (currentHistory.length < 20) { // Check if we need to regenerate to include all exercises
+              if (currentHistory.length < 20) { 
                  currentHistory = generateMockData();
                  localStorage.setItem("fitness_history", JSON.stringify(currentHistory));
               }
@@ -1074,7 +1089,6 @@
           }
         }, [user]);
 
-        // Timer Loop
         useEffect(() => {
             const timer = setInterval(() => {
                 setSets(prevSets => {
@@ -1083,8 +1097,11 @@
 
                     return prevSets.map(s => {
                         if (s.type === 'rest' && s.isRunning) {
-                            if (s.remaining <= 0) return { ...s, isRunning: false, remaining: 0 };
-                            return { ...s, remaining: s.remaining - 1 };
+                            const elapsed = s.elapsed || 0;
+                            if (elapsed >= s.duration) {
+                                return { ...s, isRunning: false, elapsed: s.duration };
+                            }
+                            return { ...s, elapsed: elapsed + 1 };
                         }
                         return s;
                     });
@@ -1093,16 +1110,45 @@
             return () => clearInterval(timer);
         }, []);
 
-        // Handlers
+        const getLastWorkoutSets = (exerciseId) => {
+          if (!history || history.length === 0) return null;
+          // History is already sorted DESC
+          const lastEntry = history.find(h => h.exerciseId === exerciseId);
+          if (!lastEntry) return null;
+          
+          // Map stored sets AND rests to UI state
+          return lastEntry.sets
+            .map(s => {
+                if (s.type === 'set') {
+                    return {
+                        type: 'set',
+                        weight: s.weight,
+                        reps: s.reps,
+                        status: 'empty' 
+                    };
+                } else if (s.type === 'rest') {
+                    return {
+                         type: 'rest',
+                         duration: s.duration || 180,
+                         elapsed: 0,
+                         isRunning: false
+                    };
+                }
+                return s;
+            });
+        };
+
         const handleSaveWorkout = async () => {
-          // Filter out rest items and only save completed sets
-          const completedSets = sets.filter((s) => s.status === "done" && s.type !== 'rest');
-          if (completedSets.length > 0) {
+          // Save ALL items (rest + sets) to restore structure later
+          // Filter 'done' sets or rest items
+          const itemsToSave = sets.filter((s) => (s.type === 'set' && s.status === 'done') || s.type === 'rest');
+          
+          if (itemsToSave.length > 0) {
             const now = new Date();
             const newEntry = {
               exerciseId: selectedExercise.id,
               exerciseName: selectedExercise.name,
-              sets: completedSets,
+              sets: itemsToSave,
               timestamp:
                 window.firebase && firebase.firestore
                   ? firebase.firestore.FieldValue.serverTimestamp()
@@ -1117,27 +1163,41 @@
               }),
             };
 
-            if (user && user.uid !== "local" && window.firebase) {
-              const db = firebase.firestore();
-              const aid =
-                typeof __app_id !== "undefined" ? __app_id : "fitness-pro-app";
-              await db
+            const db = (user && user.uid !== "local" && window.firebase) ? firebase.firestore() : null;
+            const aid = typeof __app_id !== "undefined" ? __app_id : "fitness-pro-app";
+
+            if (editingHistoryEntry && db) {
+                // UPDATE existing
+                 await db
+                .collection(`/artifacts/${aid}/users/${user.uid}/history`)
+                .doc(editingHistoryEntry)
+                .update({ sets: itemsToSave }); // Update only sets if editing
+            } else if (db) {
+                // ADD new
+                await db
                 .collection(`/artifacts/${aid}/users/${user.uid}/history`)
                 .add(newEntry);
             } else {
-              const updated = [newEntry, ...history];
-              setHistory(updated);
-              try {
-                localStorage.setItem(
-                  "fitness_history",
-                  JSON.stringify(updated)
-                );
-              } catch (e) {}
+                // Local Storage
+                let updated;
+                if (editingHistoryEntry) {
+                     updated = history.map(h => h.id === editingHistoryEntry ? { ...h, sets: itemsToSave } : h);
+                } else {
+                    // Mock ID for local
+                    newEntry.id = `local-${Date.now()}`;
+                    updated = [newEntry, ...history];
+                }
+                setHistory(updated);
+                try {
+                    localStorage.setItem("fitness_history", JSON.stringify(updated));
+                } catch (e) {}
             }
           }
-          setView("list");
+          setView("history"); // Go back to history to see change
+          setEditingHistoryEntry(null);
         };
 
+        // ... existing deletion/exercise handlers ...
         const handleSaveExercise = async (newEx) => {
           if (user && user.uid !== "local" && window.firebase) {
             const db = firebase.firestore();
@@ -1169,7 +1229,6 @@
 
         const handleDeleteExercise = async (id) => {
           if (id.startsWith("ex")) {
-            // Hide default exercise
             const newHidden = [...hiddenExerciseIds, id];
             setHiddenExerciseIds(newHidden);
             if (user && user.uid !== "local" && window.firebase) {
@@ -1190,7 +1249,6 @@
             }
             return;
           }
-          // Delete custom exercise
           if (user && user.uid !== "local" && window.firebase) {
             const db = firebase.firestore();
             const aid =
@@ -1248,7 +1306,9 @@
                 }}
                 onSelectLog={(ex) => {
                   setSelectedExercise(ex);
-                  setSets([{ type: 'set', weight: "", reps: "", status: "empty" }]);
+                  setEditingHistoryEntry(null); // New workout
+                  const lastSets = getLastWorkoutSets(ex.id);
+                  setSets(lastSets || [{ type: 'set', weight: "", reps: "", status: "empty" }]);
                   setView("log");
                 }}
                 onAddExercise={() => {
@@ -1275,17 +1335,31 @@
                 history={history}
                 onBack={() => setView("list")}
                 onStartLog={() => {
-                  setSets([{ type: 'set', weight: "", reps: "", status: "empty" }]);
+                  setEditingHistoryEntry(null); // New workout
+                  const lastSets = getLastWorkoutSets(selectedExercise.id);
+                  setSets(lastSets || [{ type: 'set', weight: "", reps: "", status: "empty" }]);
                   setView("log");
                 }}
                 onDeleteEntry={handleDeleteWorkout}
+                onEditEntry={(entry) => {
+                   setEditingHistoryEntry(entry.id);
+                   // Transform entry sets for LogView
+                   const mappedSets = entry.sets.map(s => {
+                       if(s.type === 'set') return { ...s, status: 'done' }; // Assume history items are done
+                       if(s.type === 'rest') return { ...s, elapsed: s.duration, isRunning: false };
+                       return s;
+                   });
+                   setSets(mappedSets);
+                   setView("log");
+                }}
               />
             )}
             {view === "log" && (
               <LogView
                 exercise={selectedExercise}
                 sets={sets}
-                onBack={() => setView("list")}
+                existingEntry={editingHistoryEntry}
+                onBack={() => setView("history")}
                 onSave={handleSaveWorkout}
                 onUpdateSet={(i, f, v) => {
                   const n = [...sets];
@@ -1296,21 +1370,20 @@
                   const n = [...sets];
                   if (n[i].type === 'rest') return;
                   
-                  // Security check: ensure strict order
                   const prevSets = n.slice(0, i).filter(s => s.type === 'set');
                   if (prevSets.some(s => s.status !== 'done')) return;
                   
                   const d = n[i].status !== "done";
                   n[i].status = d ? "done" : "empty";
 
-                  // Stop other timers to keep focus
+                  // Stop other timers
                   n.forEach(s => { if (s.type === 'rest') s.isRunning = false; });
                   
                   if (d) {
                     const nextItem = n[i + 1];
                     if (nextItem && nextItem.type === 'rest') {
                         nextItem.isRunning = true;
-                        nextItem.remaining = nextItem.duration; // Reset
+                        nextItem.elapsed = 0; // Start fresh on check
                     }
                   }
                   setSets(n);
@@ -1324,13 +1397,18 @@
                     status: "empty" 
                   }]);
                 }}
-                onAddRestItem={(time) => setSets([...sets, { type: 'rest', duration: time, remaining: time, isRunning: false }])}
+                // Timer defaults to NOT running
+                onAddRestItem={(time) => setSets([...sets, { type: 'rest', duration: time, elapsed: 0, isRunning: false }])}
                 onDeleteSet={(index) => {
                     const n = sets.filter((_, i) => i !== index);
                     setSets(n);
                 }}
+                onEditRestItem={(index, time) => {
+                     const n = [...sets];
+                     n[index].duration = time;
+                     setSets(n);
+                }}
                 onToggleRestTimer={(index) => {
-                    // Empty function as per user request (auto-start only)
                 }}
               />
             )}
