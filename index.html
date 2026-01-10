@@ -158,42 +158,57 @@
       // --- HELPERS FOR MOCK DATA ---
       const generateMockData = () => {
         const data = [];
-        const exId = 'ex1'; // ONLY Bench Press
         const now = new Date();
         
-        // Generate for last 30 days (approx 15 sessions)
-        for (let i = 0; i < 15; i++) { 
-            const daysAgo = 30 - (i * 2); // Spread over 30 days
-            const date = new Date(now);
-            date.setDate(date.getDate() - Math.floor(daysAgo));
-            // Add slight randomness to time to ensure sorting
-            date.setMinutes(date.getMinutes() - i);
+        // Configuration for all demo exercises
+        const exercises = [
+            { id: 'ex1', name: "Жим грудь", base: 60, inc: 1.5 },
+            { id: 'ex2', name: "Подтягивание", base: 0, inc: 0 },
+            { id: 'ex3', name: "Жим плечи", base: 30, inc: 1 },
+            { id: 'ex4', name: "Брусья", base: 10, inc: 1 },
+            { id: 'ex5', name: "Становая", base: 90, inc: 2.5 },
+            { id: 'ex6', name: "Присед", base: 80, inc: 2 },
+            { id: 'ex7', name: "Бицепс", base: 15, inc: 0.5 },
+            { id: 'ex8', name: "Трицепс", base: 20, inc: 0.5 }
+        ];
+        
+        exercises.forEach(ex => {
+            // Generate for last 30 days (approx 8-12 sessions per exercise)
+            const sessionsCount = 8 + Math.floor(Math.random() * 5);
             
-            // Progressive overload logic for Bench Press
-            let baseWeight = 60; 
-            // Increase weight over time, adding some variation
-            let weight = baseWeight + (i * 1.5); 
-            
-            const sets = [];
-            // Generate 3 working sets
-            for(let s=0; s<3; s++) {
-                sets.push({ 
-                    type: 'set', 
-                    weight: Math.floor(weight).toString(), 
-                    reps: (8 + Math.floor(Math.random() * 3)).toString(), // 8-10 reps
-                    status: 'done' 
+            for (let i = 0; i < sessionsCount; i++) { 
+                const daysAgo = 30 - (i * (30 / sessionsCount)); 
+                const date = new Date(now);
+                date.setDate(date.getDate() - Math.floor(daysAgo));
+                // Add randomness to time to ensure sorting isn't identical
+                date.setMinutes(date.getMinutes() - Math.floor(Math.random() * 100));
+                
+                // Progressive overload logic
+                let weight = ex.base + (i * ex.inc); 
+                if (ex.base === 0 && ex.inc === 0) weight = 0; // Bodyweight
+                
+                const sets = [];
+                // Generate 3 working sets
+                for(let s=0; s<3; s++) {
+                    sets.push({ 
+                        type: 'set', 
+                        weight: Math.floor(weight).toString(), 
+                        reps: (8 + Math.floor(Math.random() * 4)).toString(), 
+                        status: 'done' 
+                    });
+                }
+                
+                data.push({
+                    id: `mock-${ex.id}-${i}-${Date.now()}`,
+                    exerciseId: ex.id,
+                    exerciseName: ex.name, 
+                    dateStr: date.toLocaleDateString("ru-RU", { day: "numeric", month: "short" }),
+                    timestamp: { seconds: Math.floor(date.getTime() / 1000) },
+                    sets: sets
                 });
             }
-            
-            data.push({
-                id: `mock-${Date.now()}-${i}`,
-                exerciseId: exId,
-                exerciseName: "Жим грудь", 
-                dateStr: date.toLocaleDateString("ru-RU", { day: "numeric", month: "short" }),
-                timestamp: { seconds: Math.floor(date.getTime() / 1000) },
-                sets: sets
-            });
-        }
+        });
+
         return data.sort((a,b) => b.timestamp.seconds - a.timestamp.seconds);
       };
 
@@ -212,7 +227,9 @@
                         if (set.type === 'set' && set.status === 'done') {
                             const w = parseFloat(set.weight || 0);
                             const r = parseFloat(set.reps || 0);
-                            return acc + (w * r);
+                            // Ensure 0 weight counts as reps for volume if bodyweight, but typically volume = weight * reps. 
+                            // For bodyweight let's assume weight=1 for viz or just 0
+                            return acc + (w > 0 ? w * r : r); 
                         }
                         return acc;
                     }, 0);
@@ -309,9 +326,9 @@
                     
                     {/* X Axis Labels */}
                     <div className="flex justify-between mt-2 px-1">
-                        <span className="text-[9px] font-bold text-gray-600 uppercase">{first.date}</span>
-                         <span className="text-[9px] font-bold text-gray-600 uppercase">{mid.date}</span>
-                        <span className="text-[9px] font-bold text-gray-600 uppercase">{last.date}</span>
+                        <span className="text-[11px] font-bold text-gray-500 uppercase">{first.date}</span>
+                         <span className="text-[11px] font-bold text-gray-500 uppercase">{mid.date}</span>
+                        <span className="text-[11px] font-bold text-gray-500 uppercase">{last.date}</span>
                     </div>
                 </div>
             </div>
@@ -603,7 +620,7 @@
                           Силовая
                         </span>
                       </div>
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                      <div className="flex flex-col gap-2">
                         {item.sets.filter(s => s.type !== 'rest').map((s, i) => (
                           <div
                             key={i}
@@ -637,7 +654,7 @@
       };
 
       const RestModal = ({ isOpen, onConfirm, onClose }) => {
-        const [min, setMin] = useState('02');
+        const [min, setMin] = useState('03');
         const [sec, setSec] = useState('00');
 
         if (!isOpen) return null;
@@ -768,7 +785,7 @@
                                 <div className={`w-8 h-8 flex items-center justify-center rounded-lg ${isRunning ? 'bg-orange-500 text-white animate-pulse' : 'bg-gray-900 text-gray-500'}`}>
                                     <Icon name={isRunning ? "Flame" : "Clock"} size={16} />
                                 </div>
-                                <div className={`flex-1 font-black text-sm uppercase tracking-wider tabular-nums ${isRunning ? 'text-orange-500 text-lg' : 'text-gray-400'}`}>
+                                <div className={`flex-1 font-black text-sm uppercase tracking-wider tabular-nums ${isRunning ? 'text-orange-500 text-lg' : 'text-gray-400'} text-center`}>
                                     {isRunning ? displayTime : `Отдых ${displayTime}`}
                                 </div>
                                 <button 
@@ -803,7 +820,7 @@
                         onClick={() => !isLocked && onDeleteSet(idx)}
                         className={`w-8 h-8 flex items-center justify-center rounded-lg text-[12px] font-black cursor-pointer ${
                             item.status === "done"
-                            ? "bg-green-900/30 text-green-500"
+                            ? "bg-emerald-900/30 text-emerald-500"
                             : "bg-[#1A1A1A] text-gray-400"
                         }`}
                         >
@@ -814,7 +831,7 @@
                     <div className="col-span-4">
                         <input
                         type="number"
-                        placeholder="0"
+                        placeholder=""
                         className="w-full bg-[#1A1A1A] border border-gray-800 rounded-xl p-3 text-center text-lg font-black text-white focus:border-blue-500 focus:bg-[#222] outline-none transition-colors"
                         value={item.weight}
                         disabled={isLocked}
@@ -824,7 +841,7 @@
                     <div className="col-span-4">
                         <input
                         type="number"
-                        placeholder="0"
+                        placeholder=""
                         className="w-full bg-[#1A1A1A] border border-gray-800 rounded-xl p-3 text-center text-lg font-black text-white focus:border-blue-500 focus:bg-[#222] outline-none transition-colors"
                         value={item.reps}
                         disabled={isLocked}
@@ -836,7 +853,7 @@
                         onClick={() => !isLocked && onToggleSet(idx)}
                         className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all active:scale-90 ${
                             item.status === "done"
-                            ? "bg-green-600 text-white shadow-lg shadow-green-900/40"
+                            ? "bg-emerald-700 text-white shadow-lg shadow-emerald-900/40"
                             : isLocked 
                                 ? "bg-[#111] text-gray-700" 
                                 : "bg-[#1A1A1A] text-gray-600 hover:bg-[#222]"
@@ -1043,7 +1060,7 @@
               const h = localStorage.getItem("fitness_history");
               let currentHistory = h ? JSON.parse(h) : [];
               
-              if (currentHistory.length === 0) {
+              if (currentHistory.length < 20) { // Check if we need to regenerate to include all exercises
                  currentHistory = generateMockData();
                  localStorage.setItem("fitness_history", JSON.stringify(currentHistory));
               }
