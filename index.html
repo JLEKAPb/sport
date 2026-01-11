@@ -533,7 +533,7 @@
                 );
               })}
             </div>
-            <div className="p-6 safe-area-bottom absolute bottom-0 inset-x-0 bg-gradient-to-t from-black via-black pt-16 flex flex-col gap-4">
+            <div className="p-6 safe-area-bottom absolute bottom-0 inset-x-0 bg-gradient-to-t from-black via-black pt-16 flex flex-col gap-4 z-20">
               <button onClick={onAddSet} disabled={!canAddSet} 
                       className={`w-full py-5 text-[11px] font-black rounded-3xl border-2 border-dashed uppercase tracking-[0.2em] transition-all duration-300 ${canAddSet ? 'border-white/10 text-gray-400 active:bg-white/5 active:border-white/30' : 'border-transparent text-gray-800 opacity-20'}`}>
                 Добавить подход
@@ -582,14 +582,32 @@
 
         useEffect(() => {
           const init = async () => {
-            if (typeof window.firebase !== 'undefined') {
-              const config = typeof __firebase_config !== "undefined" ? JSON.parse(__firebase_config) : null;
-              if (config && !firebase.apps.length) firebase.initializeApp(config);
-              const auth = firebase.auth();
-              if (typeof __initial_auth_token !== "undefined" && __initial_auth_token) await auth.signInWithCustomToken(__initial_auth_token).catch(()=>auth.signInAnonymously());
-              else await auth.signInAnonymously();
-              auth.onAuthStateChanged(u => setUser(u || {uid: 'local'}));
-            } else setUser({uid: 'local'});
+            // Safety timeout: If Firebase hangs, force local mode after 2 seconds
+            const timeoutId = setTimeout(() => {
+                setUser(prev => prev || {uid: 'local'});
+            }, 2000);
+
+            try {
+                if (typeof window.firebase !== 'undefined') {
+                    const config = typeof __firebase_config !== "undefined" ? JSON.parse(__firebase_config) : null;
+                    if (config) {
+                        if (!firebase.apps.length) firebase.initializeApp(config);
+                        const auth = firebase.auth();
+                        if (typeof __initial_auth_token !== "undefined" && __initial_auth_token) await auth.signInWithCustomToken(__initial_auth_token).catch(()=>auth.signInAnonymously());
+                        else await auth.signInAnonymously();
+                        auth.onAuthStateChanged(u => {
+                            clearTimeout(timeoutId);
+                            setUser(u || {uid: 'local'});
+                        });
+                        return;
+                    }
+                }
+            } catch (e) {
+                console.error("Firebase init error, fallback to local", e);
+            }
+            // Fallback
+            clearTimeout(timeoutId);
+            setUser({uid: 'local'});
           };
           init();
         }, []);
