@@ -20,15 +20,41 @@
 
     <style>
       @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap");
+      
+      :root {
+        --bg-main: #000000;
+        --bg-card: #111111;
+        --bg-card-sec: #0a0a0a;
+        --text-main: #ffffff;
+        --text-muted: #6b7280; /* gray-500 */
+        --border-color: rgba(255, 255, 255, 0.1);
+        --input-bg: #111111;
+        --chart-line: #3b82f6;
+        --chart-text: #555555;
+      }
+
+      .theme-light {
+        --bg-main: #f3f4f6; /* gray-100 */
+        --bg-card: #ffffff;
+        --bg-card-sec: #ffffff;
+        --text-main: #111827; /* gray-900 */
+        --text-muted: #9ca3af; /* gray-400 */
+        --border-color: rgba(0, 0, 0, 0.1);
+        --input-bg: #f9fafb; /* gray-50 */
+        --chart-line: #2563eb;
+        --chart-text: #9ca3af;
+      }
+
       body {
         font-family: "Inter", sans-serif;
-        background-color: #000;
-        color: #ffffff;
+        background-color: var(--bg-main);
+        color: var(--text-main);
         margin: 0;
         overflow: hidden;
         user-select: none;
         touch-action: pan-y;
         -webkit-tap-highlight-color: transparent;
+        transition: background-color 0.3s, color 0.3s;
       }
       ::-webkit-scrollbar {
         width: 0px;
@@ -57,13 +83,15 @@
         position: relative;
         overflow: hidden;
         border-radius: 1rem;
-        background-color: #000;
+        background-color: var(--bg-main);
         touch-action: pan-y;
+        view-transition-name: var(--vt-name);
+        transition: background-color 0.3s;
       }
       .swipe-action-bg-right {
         position: absolute;
         inset: 0;
-        background-color: #000;
+        background-color: var(--bg-main);
         display: flex;
         align-items: center;
         justify-content: flex-end;
@@ -73,11 +101,12 @@
         text-transform: uppercase;
         padding-right: 1.5rem;
         z-index: 1;
+        transition: background-color 0.3s;
       }
       .swipe-action-bg-left {
         position: absolute;
         inset: 0;
-        background-color: #000;
+        background-color: var(--bg-main);
         display: flex;
         align-items: center;
         justify-content: flex-start;
@@ -87,17 +116,73 @@
         text-transform: uppercase;
         padding-left: 1.5rem;
         z-index: 1;
+        transition: background-color 0.3s;
       }
       .swipe-content {
         position: relative;
         z-index: 10;
-        background-color: #000000;
-        transition: transform 0.15s cubic-bezier(0.2, 0.8, 0.2, 1);
+        background-color: var(--bg-main);
+        transition: transform 0.15s cubic-bezier(0.2, 0.8, 0.2, 1), background-color 0.3s;
         touch-action: pan-y;
       }
       .modal-overlay {
         background-color: rgba(0, 0, 0, 0.9);
         backdrop-filter: blur(10px);
+      }
+      .theme-light .modal-overlay {
+        background-color: rgba(255, 255, 255, 0.8);
+      }
+      ::view-transition-group(*) {
+        animation-duration: 0.3s;
+        animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+      }
+      
+      /* Switch Toggle Styles */
+      .switch {
+        position: relative;
+        display: inline-block;
+        width: 50px;
+        height: 28px;
+      }
+      .switch input { 
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+      .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #ccc;
+        -webkit-transition: .4s;
+        transition: .4s;
+        border-radius: 34px;
+      }
+      .slider:before {
+        position: absolute;
+        content: "";
+        height: 20px;
+        width: 20px;
+        left: 4px;
+        bottom: 4px;
+        background-color: white;
+        -webkit-transition: .4s;
+        transition: .4s;
+        border-radius: 50%;
+      }
+      input:checked + .slider {
+        background-color: #2563eb;
+      }
+      input:focus + .slider {
+        box-shadow: 0 0 1px #2563eb;
+      }
+      input:checked + .slider:before {
+        -webkit-transform: translateX(22px);
+        -ms-transform: translateX(22px);
+        transform: translateX(22px);
       }
     </style>
   </head>
@@ -107,8 +192,12 @@
     <script type="text/babel">
       const { useState, useEffect, useRef, memo, useMemo } = React;
 
+      // --- GLOBAL SOUND FLAG ---
+      window.fitness_sound_enabled = true;
+
       // --- AUDIO HELPER ---
       const playSound = (type) => {
+        if (!window.fitness_sound_enabled) return;
         try {
           const AudioContext = window.AudioContext || window.webkitAudioContext;
           if (!AudioContext) return;
@@ -158,6 +247,8 @@
         Clock: (s) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>`,
         X: (s) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`,
         Lock: (s) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry=\"2\"></rect><path d=\"M7 11V7a5 5 0 0 1 10 0v4\"></path></svg>`,
+        Help: (s) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>`,
+        Settings: (s) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>`,
       };
 
       const Icon = ({ name, size = 24, className = "" }) => {
@@ -175,7 +266,55 @@
 
       // --- UI COMPONENTS ---
 
-      const VolumeChart = ({ history }) => {
+      const SettingsModal = ({ isOpen, onClose, soundEnabled, setSoundEnabled, theme, setTheme }) => {
+        if (!isOpen) return null;
+        return (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 modal-overlay fade-in" onClick={onClose}>
+            <div className="bg-[var(--bg-card)] w-full max-w-sm rounded-[2rem] p-8 border border-[var(--border-color)] shadow-3xl text-[var(--text-main)]" onClick={e => e.stopPropagation()}>
+              <h3 className="text-center font-black uppercase tracking-widest text-[var(--text-muted)] text-xl mb-8">Настройки</h3>
+              
+              <div className="flex justify-between items-center mb-6">
+                <span className="font-bold text-lg">Звук</span>
+                <label className="switch">
+                  <input type="checkbox" checked={soundEnabled} onChange={(e) => setSoundEnabled(e.target.checked)} />
+                  <span className="slider"></span>
+                </label>
+              </div>
+
+              <div className="flex justify-between items-center mb-8">
+                <span className="font-bold text-lg">Светлая тема</span>
+                <label className="switch">
+                  <input type="checkbox" checked={theme === 'light'} onChange={(e) => setTheme(e.target.checked ? 'light' : 'dark')} />
+                  <span className="slider"></span>
+                </label>
+              </div>
+
+              <button onClick={onClose} className="w-full py-4 bg-blue-600 rounded-2xl text-white font-black uppercase italic tracking-tight active:scale-95 transition-all">Закрыть</button>
+            </div>
+          </div>
+        );
+      };
+
+      const HelpModal = ({ isOpen, onClose }) => {
+        if (!isOpen) return null;
+        return (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 modal-overlay fade-in" onClick={onClose}>
+            <div className="bg-[var(--bg-card)] w-full max-w-sm rounded-[2rem] p-8 border border-[var(--border-color)] shadow-3xl" onClick={e => e.stopPropagation()}>
+              <h3 className="text-center font-black uppercase tracking-widest text-[var(--text-muted)] text-xl mb-6">Как пользоваться</h3>
+              <ul className="space-y-4 text-sm text-[var(--text-main)] font-bold">
+                 <li className="flex gap-3 items-center"><Icon name="Edit" size={16} className="text-yellow-500"/> <span>Свайп вправо — Изменить</span></li>
+                 <li className="flex gap-3 items-center"><Icon name="Trash" size={16} className="text-red-500"/> <span>Свайп влево — Удалить</span></li>
+                 <li className="flex gap-3 items-center"><Icon name="Dumbbell" size={16} className="text-blue-500"/> <span>Тап по иконке — История</span></li>
+                 <li className="flex gap-3 items-center"><Icon name="Plus" size={16} className="text-[var(--text-main)]"/> <span>Тап по названию — Старт</span></li>
+                 <li className="flex gap-3 items-center"><Icon name="ChevronUp" size={16} className="text-gray-500"/> <span>Стрелки — Переместить</span></li>
+              </ul>
+              <button onClick={onClose} className="w-full py-4 bg-blue-600 rounded-2xl text-white font-black uppercase italic tracking-tight mt-8 active:scale-95 transition-all">Понятно</button>
+            </div>
+          </div>
+        );
+      };
+
+      const VolumeChart = ({ history, title, subtitle, filterFn }) => {
         const data = useMemo(() => {
             if (!history || history.length === 0) return [];
             const reversed = [...history].reverse(); 
@@ -184,17 +323,26 @@
                     if (set.type === 'set' && set.status === 'done') {
                         const w = parseFloat(set.weight || 0);
                         const r = parseFloat(set.reps || 0);
+                        
+                        if (filterFn && !filterFn(r)) return acc;
+
                         return acc + (w > 0 ? w * r : r); 
                     }
                     return acc;
                 }, 0);
                 return { date: entry.dateStr, volume: volume };
             }).filter(d => d.volume > 0);
-        }, [history]);
+        }, [history, filterFn]);
 
         if (data.length < 2) return (
-            <div className="h-32 flex items-center justify-center bg-[#111] rounded-3xl border border-gray-900 mb-6">
-                <span className="text-[10px] font-bold text-gray-700 uppercase tracking-widest text-gray-700">Нужно больше данных</span>
+            <div className="h-32 flex items-center justify-center bg-[var(--bg-card)] rounded-3xl border border-[var(--border-color)] mb-6">
+                <div className="text-center">
+                    <div className="flex items-center justify-center gap-2 mb-1">
+                      <span className="text-[15px] text-[var(--text-muted)] font-black uppercase tracking-widest">{title}</span>
+                      {subtitle && <span className="text-[13px] text-gray-500 font-bold">{subtitle}</span>}
+                    </div>
+                    <span className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-widest">Нужно больше данных</span>
+                </div>
             </div>
         );
 
@@ -217,47 +365,52 @@
         }).join(' ');
 
         return (
-            <div className="bg-[#111] p-5 rounded-3xl border border-gray-900 mb-6 shadow-2xl relative overflow-hidden">
+            <div className="bg-[var(--bg-card)] p-5 rounded-3xl border border-[var(--border-color)] mb-6 shadow-2xl relative overflow-hidden">
                 <div className="flex justify-between items-start mb-2">
                   <div>
-                    <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest mb-1">Объем сессии</div>
-                    <div className="text-xl font-black text-white">{last.volume} кг</div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[15px] text-[var(--text-muted)] font-black uppercase tracking-widest">{title}</span>
+                      {subtitle && <span className="text-[13px] text-gray-500 font-bold">{subtitle}</span>}
+                    </div>
+                    <div className="text-2xl font-black text-[var(--text-main)]">{last.volume} кг</div>
                   </div>
-                  <div className={`text-[10px] font-black px-2 py-1 rounded-lg ${diff >= 0 ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                  <div className={`text-xs font-black px-2 py-1 rounded-lg ${diff >= 0 ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
                     {diff >= 0 ? '▲' : '▼'} {Math.abs(diffPct)}%
                   </div>
                 </div>
                 <div className="relative h-[130px] w-full">
                     <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full overflow-visible">
                         <path d={`${points} L ${width - padding},${height - padding} L ${padding},${height - padding} Z`} fill="url(#chartGrad)" className="opacity-30" />
-                        <defs><linearGradient id="chartGrad" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="#3b82f6" /><stop offset="100%" stopColor="#3b82f6" stopOpacity="0" /></linearGradient></defs>
-                        <polyline fill="none" stroke="#3b82f6" strokeWidth="3" points={points} strokeLinecap="round" strokeLinejoin="round" />
+                        <defs><linearGradient id="chartGrad" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="var(--chart-line)" /><stop offset="100%" stopColor="var(--chart-line)" stopOpacity="0" /></linearGradient></defs>
+                        <polyline fill="none" stroke="var(--chart-line)" strokeWidth="3" points={points} strokeLinecap="round" strokeLinejoin="round" />
                         {data.map((d, i) => {
                              const x = padding + (i / (data.length - 1)) * (width - padding * 2);
                              const range = (maxV - minV) || 1;
                              const y = height - padding - ((d.volume - minV) / range) * (height - padding * 2);
-                             return <circle key={i} cx={x} cy={y} r="3" fill="#000" stroke="#3b82f6" strokeWidth="2" />
+                             return <circle key={i} cx={x} cy={y} r="3" fill="var(--bg-card)" stroke="var(--chart-line)" strokeWidth="2" />
                         })}
-                        <text x={padding} y={height - 2} fill="#555" fontSize="15" fontWeight="900" textAnchor="start">{data[0].date}</text>
-                        <text x={width - padding} y={height - 2} fill="#555" fontSize="15" fontWeight="900" textAnchor="end">{data[data.length-1].date}</text>
+                        <text x={padding} y={height - 2} fill="var(--chart-text)" fontSize="18" fontWeight="900" textAnchor="start">{data[0].date}</text>
+                        <text x={width - padding} y={height - 2} fill="var(--chart-text)" fontSize="18" fontWeight="900" textAnchor="end">{data[data.length-1].date}</text>
                     </svg>
                 </div>
             </div>
         );
       };
 
-      const SwipableItem = ({ children, onDelete, onEdit, id, bgClass = "bg-[#111]" }) => {
+      const SwipableItem = ({ children, onDelete, onEdit, id, bgClass = "bg-[var(--bg-card)]", style }) => {
         const [swipeOffset, setSwipeOffset] = useState(0);
         const startX = useRef(0);
+        const startOffset = useRef(0); 
         const isDragging = useRef(false);
         const hasMoved = useRef(false);
         
         const revealThreshold = 70;
-        const maxSwipe = 95; // Максимальное визуальное смещение
+        const maxSwipe = 95; 
 
         const onPointerDown = (e) => {
           if (e.target.closest('.reorder-btn')) return;
           startX.current = e.clientX;
+          startOffset.current = swipeOffset; 
           isDragging.current = true;
           hasMoved.current = false;
         };
@@ -272,13 +425,12 @@
           }
           
           if (hasMoved.current) {
-            let val = diff;
-            // Ограничиваем свайп, чтобы кнопки были видны, но не улетали бесконечно
-            if (val > 0) { // Свайп вправо (открывает Изменить слева)
-              if (!onEdit) val = val * 0.1; // Сопротивление, если редактирование не поддерживается
-              else if (val > maxSwipe) val = maxSwipe + (val - maxSwipe) * 0.15; // "Резиновый" эффект
-            } else { // Свайп влево (открывает Удалить справа)
-              if (val < -maxSwipe) val = -maxSwipe + (val + maxSwipe) * 0.15; // "Резиновый" эффект
+            let val = startOffset.current + diff;
+            if (val > 0) { 
+              if (!onEdit) val = val * 0.1; 
+              else if (val > maxSwipe) val = maxSwipe + (val - maxSwipe) * 0.15; 
+            } else { 
+              if (val < -maxSwipe) val = -maxSwipe + (val + maxSwipe) * 0.15; 
             }
             setSwipeOffset(val);
           }
@@ -288,12 +440,10 @@
           if (!isDragging.current) return;
           isDragging.current = false;
           e.currentTarget.releasePointerCapture(e.pointerId);
-
-          // Фиксация в открытом состоянии или возврат
           if (swipeOffset < -revealThreshold) {
-            setSwipeOffset(-85); // Фиксируем, чтобы кнопка Удалить была видна
+            setSwipeOffset(-85); 
           } else if (swipeOffset > revealThreshold && onEdit) {
-            setSwipeOffset(85); // Фиксируем, чтобы кнопка Изменить была видна
+            setSwipeOffset(85); 
           } else {
             setSwipeOffset(0);
           }
@@ -312,7 +462,7 @@
         };
 
         return (
-          <div className="swipe-item-container mb-2">
+          <div className="swipe-item-container mb-2" style={style}>
             <div 
               className={`swipe-action-bg-right transition-opacity ${swipeOffset < 0 ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'}`} 
               onClick={handleDeleteClick}
@@ -341,33 +491,61 @@
 
       // --- VIEWS ---
 
-      const ListView = ({ exercises, history, onSelectHistory, onSelectLog, onAddExercise, onDeleteExercise, onEditExercise, onMoveExercise }) => {
+      const ListView = ({ exercises, history, onSelectHistory, onSelectLog, onAddExercise, onDeleteExercise, onEditExercise, onMoveExercise, setSettingsOpen }) => {
+        const [showHelp, setShowHelp] = useState(false);
         const getLastLog = (exId) => history.filter((h) => h.exerciseId === exId)[0] || null;
         return (
-          <div className="flex flex-col h-screen bg-black fade-in">
-            <div className="p-6 pt-10 flex justify-between items-center bg-black sticky top-0 z-20">
-              <h1 className="text-2xl font-black tracking-tight uppercase italic text-white">Iron Track</h1>
-              <button 
-                onClick={onAddExercise} 
-                className="text-white bg-blue-600 w-12 h-12 flex items-center justify-center rounded-2xl shadow-xl active:scale-90 transition-transform flex-shrink-0"
-              >
-                <Icon name="Plus" size={24} />
-              </button>
+          <div className="flex flex-col h-screen bg-[var(--bg-main)] fade-in">
+            <HelpModal isOpen={showHelp} onClose={() => setShowHelp(false)} />
+            <div className="p-6 pt-10 flex justify-between items-center bg-[var(--bg-main)] sticky top-0 z-20">
+              <h1 className="text-2xl font-black tracking-tight uppercase italic text-[var(--text-main)]">Iron Track</h1>
+              <div className="flex gap-3">
+                  <button 
+                    onClick={() => setSettingsOpen(true)} 
+                    className="text-white bg-gray-700 w-12 h-12 flex items-center justify-center rounded-2xl active:bg-gray-600 transition-colors flex-shrink-0"
+                  >
+                    <Icon name="Settings" size={24} />
+                  </button>
+                  <button 
+                    onClick={() => setShowHelp(true)} 
+                    className="text-white bg-yellow-500 w-12 h-12 flex items-center justify-center rounded-2xl active:bg-yellow-600 transition-colors flex-shrink-0"
+                  >
+                    <Icon name="Help" size={24} />
+                  </button>
+                  <button 
+                    onClick={onAddExercise} 
+                    className="text-white bg-blue-600 w-12 h-12 flex items-center justify-center rounded-2xl shadow-xl active:scale-90 transition-transform flex-shrink-0"
+                  >
+                    <Icon name="Plus" size={24} />
+                  </button>
+              </div>
             </div>
             <div className="flex-1 overflow-y-auto px-4 pb-10">
               {exercises.map((ex, idx) => {
                 const lastLog = getLastLog(ex.id);
+                let lastSetString = "";
+                if (lastLog) {
+                    const setsOnly = lastLog.sets.filter(s => s.type === 'set');
+                    if (setsOnly.length > 0) {
+                        const last = setsOnly[setsOnly.length - 1];
+                        lastSetString = `: ${last.weight} кг ${last.reps} раз`;
+                    }
+                }
+
                 return (
-                  <SwipableItem key={ex.id} id={ex.id} onDelete={onDeleteExercise} onEdit={() => onEditExercise(ex)} bgClass="bg-[#0a0a0a]">
-                    <div className="flex items-center py-4 px-3 active:bg-white/5 transition-colors rounded-2xl border border-white/5">
+                  <SwipableItem key={ex.id} id={ex.id} onDelete={onDeleteExercise} onEdit={() => onEditExercise(ex)} bgClass="bg-[var(--bg-card-sec)]" style={{ "--vt-name": `item-${ex.id}` }}>
+                    <div className="flex items-center py-4 px-3 active:bg-black/5 transition-colors rounded-2xl border border-[var(--border-color)]">
                       
                       <div onClick={() => onSelectHistory(ex)} className={`w-14 h-14 rounded-2xl flex items-center justify-center mr-4 bg-gradient-to-br ${ex.bg || 'from-gray-800 to-black'} shadow-lg cursor-pointer flex-shrink-0`}>
                         <Icon name={ex.icon || "Dumbbell"} size={26} />
                       </div>
 
                       <div onClick={() => onSelectLog(ex)} className="flex-1 cursor-pointer py-1">
-                        <div className="font-black text-[17px] leading-tight text-white mb-1">{ex.name}</div>
-                        <div className="text-[10px] text-gray-600 font-black uppercase tracking-widest">
+                        <div className="font-black text-[17px] leading-tight text-[var(--text-main)] mb-1">
+                            {ex.name}
+                            {lastSetString && <span className="text-[var(--text-muted)] text-[14px] font-bold">{lastSetString}</span>}
+                        </div>
+                        <div className="text-[10px] text-gray-500 font-black uppercase tracking-widest">
                           {lastLog ? `${lastLog.dateStr} • ${lastLog.sets.filter(s=>s.type==='set').length} сетов` : ''}
                         </div>
                       </div>
@@ -376,14 +554,14 @@
                         <button 
                           onClick={(e) => { e.stopPropagation(); onMoveExercise(ex.id, -1); }}
                           disabled={idx === 0}
-                          className={`reorder-btn p-1.5 rounded-lg active:bg-white/10 ${idx === 0 ? 'opacity-10' : 'opacity-40 hover:opacity-100'}`}
+                          className={`reorder-btn p-1.5 rounded-lg active:bg-white/10 active:scale-90 transition-transform duration-200 ${idx === 0 ? 'opacity-10' : 'opacity-40 hover:opacity-100'}`}
                         >
                           <Icon name="ChevronUp" size={16} />
                         </button>
                         <button 
                           onClick={(e) => { e.stopPropagation(); onMoveExercise(ex.id, 1); }}
                           disabled={idx === exercises.length - 1}
-                          className={`reorder-btn p-1.5 rounded-lg active:bg-white/10 ${idx === exercises.length - 1 ? 'opacity-10' : 'opacity-40 hover:opacity-100'}`}
+                          className={`reorder-btn p-1.5 rounded-lg active:bg-white/10 active:scale-90 transition-transform duration-200 ${idx === exercises.length - 1 ? 'opacity-10' : 'opacity-40 hover:opacity-100'}`}
                         >
                           <Icon name="ChevronDown" size={16} />
                         </button>
@@ -400,18 +578,18 @@
       const ExerciseFormView = ({ onBack, onSave, initialData }) => {
         const [name, setName] = useState(initialData?.name || "");
         return (
-          <div className="flex flex-col h-screen bg-black fade-in">
-            <div className="p-4 pt-10 flex items-center bg-black border-b border-white/5">
+          <div className="flex flex-col h-screen bg-[var(--bg-main)] fade-in">
+            <div className="p-4 pt-10 flex items-center bg-[var(--bg-main)] border-b border-[var(--border-color)]">
               <div onClick={onBack} className="p-2 cursor-pointer text-blue-500 active:scale-90 transition-transform"><Icon name="ChevronLeft" size={28} /></div>
-              <h2 className="flex-1 text-center font-black uppercase italic text-lg">{initialData ? "Настройка" : "Новое"}</h2>
+              <h2 className="flex-1 text-center font-black uppercase italic text-lg text-[var(--text-main)]">{initialData ? "Настройка" : "Новое"}</h2>
             </div>
             <div className="flex-1 p-8 space-y-4">
-              <label className="text-[10px] font-black text-gray-600 uppercase tracking-[0.2em] ml-1 text-gray-600">Название упражнения</label>
-              <input type="text" className="w-full bg-[#111] border border-gray-800 rounded-2xl p-5 text-white font-black text-xl outline-none focus:border-blue-600 transition-colors" 
+              <label className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] ml-1">Название упражнения</label>
+              <input type="text" className="w-full bg-[var(--input-bg)] border border-[var(--border-color)] rounded-2xl p-5 text-[var(--text-main)] font-black text-xl outline-none focus:border-blue-600 transition-colors" 
                      placeholder="Жим гантелей..." value={name} onChange={(e) => setName(e.target.value)} autoFocus />
             </div>
             <div className="p-6 safe-area-bottom"><button onClick={() => onSave({id: initialData?.id || generateId(), name: name.trim(), icon: "Dumbbell", bg: "from-gray-700 to-black"})} 
-                    className="w-full py-5 bg-blue-600 rounded-3xl font-black uppercase italic text-lg shadow-xl active:scale-95 transition-all">Сохранить</button></div>
+                    className="w-full py-5 bg-blue-600 rounded-3xl text-white font-black uppercase italic text-lg shadow-xl active:scale-95 transition-all">Сохранить</button></div>
           </div>
         );
       };
@@ -419,26 +597,27 @@
       const DetailView = ({ exercise, history, onBack, onStartLog, onDeleteEntry, onEditEntry }) => {
         const exHistory = useMemo(() => history.filter((h) => h.exerciseId === exercise?.id), [history, exercise]);
         return (
-          <div className="flex flex-col h-screen bg-black fade-in">
-            <div className="p-4 pt-10 flex items-center bg-black border-b border-white/5 sticky top-0 z-20">
+          <div className="flex flex-col h-screen bg-[var(--bg-main)] fade-in">
+            <div className="p-4 pt-10 flex items-center bg-[var(--bg-main)] border-b border-[var(--border-color)] sticky top-0 z-20">
               <div onClick={onBack} className="p-2 cursor-pointer text-blue-500 active:scale-90 transition-transform"><Icon name="ChevronLeft" size={28} /></div>
-              <h2 className="flex-1 text-center font-black uppercase italic text-lg truncate px-4">{exercise?.name}</h2>
+              <h2 className="flex-1 text-center font-black uppercase italic text-lg truncate px-4 text-[var(--text-main)]">{exercise?.name}</h2>
             </div>
             <div className="flex-1 overflow-y-auto p-4 pb-10">
-              <VolumeChart history={exHistory} />
-              <h3 className="text-[10px] font-black text-gray-700 uppercase px-1 mb-5 tracking-[0.2em]">История</h3>
+              <VolumeChart history={exHistory} title="Силовая" subtitle="< 8 повт." filterFn={r => r < 8} />
+              <VolumeChart history={exHistory} title="Обьем" subtitle="≥ 8 повт." filterFn={r => r >= 8} />
+              <h3 className="text-[10px] font-black text-gray-500 uppercase px-1 mb-5 tracking-[0.2em]">История</h3>
               {exHistory.length === 0 ? (
-                <div className="text-center py-20 text-gray-800 font-black uppercase text-xs tracking-widest text-gray-800">Пусто</div>
+                <div className="text-center py-20 text-gray-500 font-black uppercase text-xs tracking-widest">Пусто</div>
               ) : (
                 exHistory.map((item) => (
-                  <SwipableItem key={item.id} id={item.id} onDelete={onDeleteEntry} onEdit={() => onEditEntry(item)} bgClass="bg-[#0a0a0a]">
-                    <div className="p-5 border border-white/5 rounded-3xl">
-                      <div className="flex justify-between items-center mb-4"><span className="font-black text-sm uppercase text-gray-400 tracking-widest text-gray-400">{item.dateStr}</span></div>
+                  <SwipableItem key={item.id} id={item.id} onDelete={onDeleteEntry} onEdit={() => onEditEntry(item)} bgClass="bg-[var(--bg-card-sec)]">
+                    <div className="p-5 border border-[var(--border-color)] rounded-3xl">
+                      <div className="flex justify-between items-center mb-4"><span className="font-black text-sm uppercase text-gray-400 tracking-widest">{item.dateStr}</span></div>
                       <div className="space-y-2">
                         {item.sets.filter(s=>s.type==='set').map((s, i) => (
                           <div key={i} className="flex justify-between text-sm bg-white/5 p-2 rounded-xl">
-                            <span className="text-gray-600 font-black text-gray-600">#{i+1}</span>
-                            <span className="font-black text-gray-200">{s.weight} кг × {s.reps}</span>
+                            <span className="text-gray-500 font-black">#{i+1}</span>
+                            <span className="font-black text-[var(--text-main)]">{s.weight} кг × {s.reps}</span>
                           </div>
                         ))}
                       </div>
@@ -458,15 +637,15 @@
         if (!isOpen) return null;
         return (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 modal-overlay fade-in">
-            <div className="bg-[#111] w-full max-w-xs rounded-[2.5rem] p-8 border border-white/10 shadow-3xl">
-              <h3 className="text-center font-black uppercase tracking-widest text-gray-500 text-[10px] mb-8 text-gray-500">Настроить отдых</h3>
+            <div className="bg-[var(--bg-card)] w-full max-w-xs rounded-[2.5rem] p-8 border border-[var(--border-color)] shadow-3xl">
+              <h3 className="text-center font-black uppercase tracking-widest text-gray-500 text-[10px] mb-8">Настроить отдых</h3>
               <div className="flex justify-center gap-4 mb-10">
-                <input type="number" className="w-20 h-20 bg-black border border-white/10 rounded-3xl text-center text-4xl font-black outline-none focus:border-blue-600" value={min} onChange={e => setMin(e.target.value.slice(0, 2))} />
-                <span className="text-4xl font-black text-gray-800 self-center text-gray-800">:</span>
-                <input type="number" className="w-20 h-20 bg-black border border-white/10 rounded-3xl text-center text-4xl font-black outline-none focus:border-blue-600" value={sec} onChange={e => setSec(e.target.value.slice(0, 2))} />
+                <input type="number" className="w-20 h-20 bg-[var(--bg-main)] border border-[var(--border-color)] rounded-3xl text-center text-4xl text-[var(--text-main)] font-black outline-none focus:border-blue-600" value={min} onChange={e => setMin(e.target.value.slice(0, 2))} />
+                <span className="text-4xl font-black text-gray-500 self-center">:</span>
+                <input type="number" className="w-20 h-20 bg-[var(--bg-main)] border border-[var(--border-color)] rounded-3xl text-center text-4xl text-[var(--text-main)] font-black outline-none focus:border-blue-600" value={sec} onChange={e => setSec(e.target.value.slice(0, 2))} />
               </div>
-              <button onClick={() => onConfirm(parseInt(min)*60 + parseInt(sec))} className="w-full py-5 bg-blue-600 rounded-3xl font-black uppercase italic tracking-tight active:scale-95 transition-all">Применить</button>
-              <button onClick={onClose} className="w-full py-4 text-gray-600 font-black uppercase text-[10px] tracking-widest mt-2 active:text-white text-gray-600">Отмена</button>
+              <button onClick={() => onConfirm(parseInt(min)*60 + parseInt(sec))} className="w-full py-5 bg-blue-600 rounded-3xl text-white font-black uppercase italic tracking-tight active:scale-95 transition-all">Применить</button>
+              <button onClick={onClose} className="w-full py-4 text-gray-500 font-black uppercase text-[10px] tracking-widest mt-2 active:text-[var(--text-main)]">Отмена</button>
             </div>
           </div>
         );
@@ -482,11 +661,11 @@
         const canAddRest = lastItem && lastItem.type === 'set';
 
         return (
-          <div className="flex flex-col h-screen bg-black fade-in">
+          <div className="flex flex-col h-screen bg-[var(--bg-main)] fade-in">
             <RestModal isOpen={showRestModal} onClose={() => {setShowRestModal(false); setEditingRestIndex(null);}} initialTime={editingRestIndex !== null ? sets.find(s=>s._id===editingRestIndex).duration : null} onConfirm={(t) => { onEditRestItem(editingRestIndex, t); setShowRestModal(false); setEditingRestIndex(null); }} />
-            <div className="p-4 pt-10 flex justify-between items-center bg-black border-b border-white/5 sticky top-0 z-20">
+            <div className="p-4 pt-10 flex justify-between items-center bg-[var(--bg-main)] border-b border-[var(--border-color)] sticky top-0 z-20">
               <div onClick={onBack} className="p-2 cursor-pointer text-blue-500 active:scale-90 transition-transform"><Icon name="ChevronLeft" size={28} /></div>
-              <div className="text-center flex-1 px-4 overflow-hidden"><h2 className="text-[9px] font-black uppercase text-gray-600 tracking-widest truncate mb-0.5 text-gray-600">{exercise?.name}</h2><div className="text-xl font-black tracking-tight uppercase italic text-white">{existingEntry ? 'Правка' : ''}</div></div>
+              <div className="text-center flex-1 px-4 overflow-hidden"><h2 className="text-[9px] font-black uppercase text-gray-500 tracking-widest truncate mb-0.5">{exercise?.name}</h2><div className="text-xl font-black tracking-tight uppercase italic text-[var(--text-main)]">{existingEntry ? 'Правка' : ''}</div></div>
               <button 
                 onClick={onSave} 
                 disabled={isSaving}
@@ -496,7 +675,7 @@
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-4 pb-48">
-              <div className="grid grid-cols-12 gap-3 text-[9px] font-black text-gray-700 uppercase mb-6 px-2 tracking-widest text-gray-700">
+              <div className="grid grid-cols-12 gap-3 text-[9px] font-black text-gray-500 uppercase mb-6 px-2 tracking-widest">
                 <div className="col-span-2 text-center">Сет</div>
                 <div className="col-span-4 text-center">Вес (кг)</div>
                 <div className="col-span-4 text-center">Повт</div>
@@ -507,9 +686,9 @@
                     const elapsedF = `${Math.floor((item.elapsed||0)/60)}:${((item.elapsed||0)%60).toString().padStart(2,'0')}`;
                     const durF = `${Math.floor(item.duration/60)}:${(item.duration%60).toString().padStart(2,'0')}`;
                     return (
-                        <SwipableItem key={item._id} id={item._id} onDelete={onDeleteSet} onEdit={() => { setEditingRestIndex(item._id); setShowRestModal(true); }} bgClass="bg-black">
-                          <div className={`col-span-12 flex flex-col items-center justify-center py-4 rounded-[1.5rem] border border-dashed transition-all duration-300 ${item.isRunning ? 'border-orange-500 shadow-[0_0_20px_rgba(249,115,22,0.1)]' : 'border-white/10'}`}>
-                            <div className={`font-black text-5xl tabular-nums tracking-tighter ${item.isRunning ? 'text-orange-500' : 'text-gray-600'}`}>{elapsedF} <span className="text-2xl text-white/10 mx-1 text-white/10">/</span> {durF}</div>
+                        <SwipableItem key={item._id} id={item._id} onDelete={onDeleteSet} onEdit={() => { setEditingRestIndex(item._id); setShowRestModal(true); }} bgClass="bg-[var(--bg-main)]">
+                          <div className={`col-span-12 flex flex-col items-center justify-center py-4 rounded-[1.5rem] border border-dashed transition-all duration-300 ${item.isRunning ? 'border-orange-500 shadow-[0_0_20px_rgba(249,115,22,0.1)]' : 'border-[var(--border-color)]'}`}>
+                            <div className={`font-black text-5xl tabular-nums tracking-tighter ${item.isRunning ? 'text-orange-500' : 'text-gray-500'}`}>{elapsedF} <span className="text-2xl text-white/10 mx-1 text-white/10">/</span> {durF}</div>
                           </div>
                         </SwipableItem>
                     );
@@ -518,28 +697,28 @@
                 if (item.status !== 'done') canNext = false;
                 const setN = sets.slice(0, idx+1).filter(s=>s.type==='set').length;
                 return (
-                  <SwipableItem key={item._id} id={item._id} onDelete={onDeleteSet} bgClass="bg-black">
+                  <SwipableItem key={item._id} id={item._id} onDelete={onDeleteSet} bgClass="bg-[var(--bg-main)]">
                     <div className={`grid grid-cols-12 gap-3 items-center transition-all duration-300 ${locked ? 'opacity-40' : ''} ${item.status==='done' ? 'opacity-50' : ''}`}>
                       <div className="col-span-2 flex justify-center">
-                        <div className={`w-11 h-11 flex items-center justify-center rounded-2xl text-[15px] font-black transition-all ${item.status==='done' ? 'bg-emerald-900/30 text-emerald-500' : 'bg-[#111] text-gray-500'}`}>
+                        <div className={`w-11 h-11 flex items-center justify-center rounded-2xl text-[15px] font-black transition-all ${item.status==='done' ? 'bg-emerald-900/30 text-emerald-500' : 'bg-[var(--bg-card)] text-gray-500'}`}>
                           {setN}
                         </div>
                       </div>
-                      <div className="col-span-4"><input type="number" className="w-full bg-[#111] border border-white/5 rounded-2xl p-4 text-center text-xl font-black text-white outline-none focus:border-blue-600 transition-colors" value={item.weight} onChange={(e) => onUpdateSet(idx, 'weight', e.target.value)} /></div>
-                      <div className="col-span-4"><input type="number" className="w-full bg-[#111] border border-white/5 rounded-2xl p-4 text-center text-xl font-black text-white outline-none focus:border-blue-600 transition-colors" value={item.reps} onChange={(e) => onUpdateSet(idx, 'reps', e.target.value)} /></div>
-                      <div className="col-span-2 flex justify-center"><button onClick={() => !locked && onToggleSet(idx)} className={`w-14 h-14 flex items-center justify-center rounded-2xl transition-all active:scale-90 ${item.status==='done' ? 'bg-emerald-600 shadow-xl shadow-emerald-900/40' : 'bg-[#111] text-gray-700'}`}><Icon name={locked ? "Lock" : "Check"} size={28}/></button></div>
+                      <div className="col-span-4"><input type="number" className="w-full bg-[var(--input-bg)] border border-[var(--border-color)] rounded-2xl p-4 text-center text-xl font-black text-[var(--text-main)] outline-none focus:border-blue-600 transition-colors" value={item.weight} onChange={(e) => onUpdateSet(idx, 'weight', e.target.value)} /></div>
+                      <div className="col-span-4"><input type="number" className="w-full bg-[var(--input-bg)] border border-[var(--border-color)] rounded-2xl p-4 text-center text-xl font-black text-[var(--text-main)] outline-none focus:border-blue-600 transition-colors" value={item.reps} onChange={(e) => onUpdateSet(idx, 'reps', e.target.value)} /></div>
+                      <div className="col-span-2 flex justify-center"><button onClick={() => !locked && onToggleSet(idx)} className={`w-14 h-14 flex items-center justify-center rounded-2xl transition-all active:scale-90 ${item.status==='done' ? 'bg-emerald-600 shadow-xl shadow-emerald-900/40 text-white' : 'bg-[var(--bg-card)] text-gray-500'}`}><Icon name={locked ? "Lock" : "Check"} size={28}/></button></div>
                     </div>
                   </SwipableItem>
                 );
               })}
             </div>
-            <div className="p-6 safe-area-bottom absolute bottom-0 inset-x-0 bg-gradient-to-t from-black via-black pt-16 flex flex-col gap-4 z-20">
+            <div className="p-6 safe-area-bottom absolute bottom-0 inset-x-0 bg-gradient-to-t from-[var(--bg-main)] via-[var(--bg-main)] pt-16 flex flex-col gap-4 z-20">
               <button onClick={onAddSet} disabled={!canAddSet} 
-                      className={`w-full py-5 text-[11px] font-black rounded-3xl border-2 border-dashed uppercase tracking-[0.2em] transition-all duration-300 ${canAddSet ? 'border-white/10 text-gray-400 active:bg-white/5 active:border-white/30' : 'border-transparent text-gray-800 opacity-20'}`}>
+                      className={`w-full py-5 text-[11px] font-black rounded-3xl border-2 border-dashed uppercase tracking-[0.2em] transition-all duration-300 ${canAddSet ? 'border-[var(--border-color)] text-gray-400 active:bg-white/5' : 'border-transparent text-gray-500 opacity-20'}`}>
                 Добавить подход
               </button>
               <button onClick={() => onAddRestItem(180)} disabled={!canAddRest} 
-                      className={`w-full py-5 text-[11px] font-black rounded-3xl border-2 border-dashed uppercase tracking-[0.2em] transition-all duration-300 ${canAddRest ? 'border-white/10 text-gray-400 active:bg-white/5 active:border-white/30' : 'border-transparent text-gray-800 opacity-20'}`}>
+                      className={`w-full py-5 text-[11px] font-black rounded-3xl border-2 border-dashed uppercase tracking-[0.2em] transition-all duration-300 ${canAddRest ? 'border-[var(--border-color)] text-gray-400 active:bg-white/5' : 'border-transparent text-gray-500 opacity-20'}`}>
                 Добавить отдых
               </button>
             </div>
@@ -561,6 +740,41 @@
         const [sets, setSets] = useState([{ _id: generateId(), type: 'set', weight: "", reps: "", status: "empty" }]);
         const [editingHistoryEntryId, setEditingHistoryEntryId] = useState(null);
         const [isSaving, setIsSaving] = useState(false);
+        const [settingsOpen, setSettingsOpen] = useState(false);
+        
+        // --- Settings State ---
+        const [soundEnabled, setSoundEnabled] = useState(() => {
+            try {
+                const saved = localStorage.getItem("fitness_sound_enabled");
+                return saved !== null ? JSON.parse(saved) : true;
+            } catch (e) {
+                return true;
+            }
+        });
+        const [theme, setTheme] = useState(() => {
+            try {
+                return localStorage.getItem("fitness_theme") || "dark";
+            } catch (e) {
+                return "dark";
+            }
+        });
+
+        // Sync global sound state
+        useEffect(() => {
+            window.fitness_sound_enabled = soundEnabled;
+            try {
+                localStorage.setItem("fitness_sound_enabled", JSON.stringify(soundEnabled));
+            } catch (e) {}
+        }, [soundEnabled]);
+
+        // Sync theme state
+        useEffect(() => {
+            if (theme === 'light') document.body.classList.add('theme-light');
+            else document.body.classList.remove('theme-light');
+            try {
+                localStorage.setItem("fitness_theme", theme);
+            } catch (e) {}
+        }, [theme]);
 
         const allExercises = useMemo(() => {
           const base = INITIAL_EXERCISES.map(ie => customExercises.find(ce => ce.id === ie.id) || ie);
@@ -630,15 +844,19 @@
             });
             return () => { if(unsubH) unsubH(); if(unsubC) unsubC(); if(unsubS) unsubS(); };
           } else {
-            const h = localStorage.getItem("fitness_history");
-            setHistory(h ? JSON.parse(h) : []);
-            const e = localStorage.getItem("fitness_custom_exercises");
-            if (e) setCustomExercises(JSON.parse(e));
-            const s = localStorage.getItem("fitness_preferences");
-            if (s) {
-              const prefs = JSON.parse(s);
-              setHiddenExerciseIds(prefs.hiddenIds || []);
-              setExerciseOrder(prefs.exerciseOrder || []);
+            try {
+                const h = localStorage.getItem("fitness_history");
+                setHistory(h ? JSON.parse(h) : []);
+                const e = localStorage.getItem("fitness_custom_exercises");
+                if (e) setCustomExercises(JSON.parse(e));
+                const s = localStorage.getItem("fitness_preferences");
+                if (s) {
+                  const prefs = JSON.parse(s);
+                  setHiddenExerciseIds(prefs.hiddenIds || []);
+                  setExerciseOrder(prefs.exerciseOrder || []);
+                }
+            } catch (e) {
+                console.warn("Storage access failed", e);
             }
           }
         }, [user]);
@@ -666,7 +884,9 @@
             const aid = typeof __app_id !== "undefined" ? __app_id : "iron-track-app";
             await db.collection(`/artifacts/${aid}/users/${user.uid}/settings`).doc("preferences").set(prefs, { merge: true });
           } else {
-            localStorage.setItem("fitness_preferences", JSON.stringify(prefs));
+            try {
+                localStorage.setItem("fitness_preferences", JSON.stringify(prefs));
+            } catch (e) {}
           }
         };
 
@@ -678,11 +898,22 @@
           const newIndex = index + direction;
           if (newIndex < 0 || newIndex >= currentOrder.length) return;
           
-          const newOrder = [...currentOrder];
-          [newOrder[index], newOrder[newIndex]] = [newOrder[newIndex], newOrder[index]];
-          
-          setExerciseOrder(newOrder);
-          updatePreferences({ exerciseOrder: newOrder, hiddenIds: hiddenExerciseIds });
+          const update = () => {
+             const newOrder = [...currentOrder];
+             [newOrder[index], newOrder[newIndex]] = [newOrder[newIndex], newOrder[index]];
+             setExerciseOrder(newOrder);
+             updatePreferences({ exerciseOrder: newOrder, hiddenIds: hiddenExerciseIds });
+          };
+
+          if (document.startViewTransition && window.ReactDOM && ReactDOM.flushSync) {
+             document.startViewTransition(() => {
+                ReactDOM.flushSync(() => {
+                   update();
+                });
+             });
+          } else {
+             update();
+          }
         };
 
         const startSession = (ex) => {
@@ -720,7 +951,9 @@
             } else {
                 let updated = editingHistoryEntryId ? history.map(h => h.id === editingHistoryEntryId ? { ...h, sets: itemsToSave } : h) : [{ ...entry, id: generateId() }, ...history];
                 setHistory(updated);
-                localStorage.setItem("fitness_history", JSON.stringify(updated));
+                try {
+                    localStorage.setItem("fitness_history", JSON.stringify(updated));
+                } catch (e) {}
             }
             setView("list");
           } catch (e) {
@@ -744,7 +977,9 @@
                } else {
                   const updated = customExercises.filter(ce => ce.id !== id);
                   setCustomExercises(updated);
-                  localStorage.setItem("fitness_custom_exercises", JSON.stringify(updated));
+                  try {
+                    localStorage.setItem("fitness_custom_exercises", JSON.stringify(updated));
+                  } catch (e) {}
                }
             } else {
                if (!nextHiddenIds.includes(id)) {
@@ -766,8 +1001,9 @@
         if (!user) return <div className="h-screen bg-black flex items-center justify-center font-black animate-pulse text-white">IRON TRACK</div>;
 
         return (
-          <div className="max-w-md mx-auto h-screen bg-black border-x border-gray-900 relative overflow-hidden text-white shadow-3xl">
-            {view === "list" && <ListView exercises={allExercises} history={history} onSelectHistory={ex => { setSelectedExercise(ex); setView("history"); }} onSelectLog={startSession} onAddExercise={() => { setEditingExercise(null); setView("exercise_form"); }} onDeleteExercise={id => handleActionOnExercise(id, 'delete')} onEditExercise={ex => { setEditingExercise(ex); setView("exercise_form"); }} onMoveExercise={handleMoveExercise} />}
+          <div className="max-w-md mx-auto h-screen bg-[var(--bg-main)] border-x border-gray-900 relative overflow-hidden text-[var(--text-main)] shadow-3xl">
+            <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} soundEnabled={soundEnabled} setSoundEnabled={setSoundEnabled} theme={theme} setTheme={setTheme} />
+            {view === "list" && <ListView exercises={allExercises} history={history} onSelectHistory={ex => { setSelectedExercise(ex); setView("history"); }} onSelectLog={startSession} onAddExercise={() => { setEditingExercise(null); setView("exercise_form"); }} onDeleteExercise={id => handleActionOnExercise(id, 'delete')} onEditExercise={ex => { setEditingExercise(ex); setView("exercise_form"); }} onMoveExercise={handleMoveExercise} setSettingsOpen={setSettingsOpen} />}
             {view === "exercise_form" && <ExerciseFormView initialData={editingExercise} onBack={() => setView("list")} onSave={ex => { 
                 if (user.uid !== 'local' && window.firebase) {
                    const db = firebase.firestore();
@@ -776,7 +1012,9 @@
                 } else {
                    const updated = [...customExercises.filter(e=>e.id!==ex.id), ex];
                    setCustomExercises(updated);
-                   localStorage.setItem("fitness_custom_exercises", JSON.stringify(updated));
+                   try {
+                        localStorage.setItem("fitness_custom_exercises", JSON.stringify(updated));
+                   } catch (e) {}
                 }
                 if (!exerciseOrder.includes(ex.id)) {
                   const newOrder = [ex.id, ...exerciseOrder];
@@ -785,7 +1023,7 @@
                 }
                 setView("list"); 
             }} />}
-            {view === "history" && <DetailView exercise={selectedExercise} history={history} onBack={() => setView("list")} onStartLog={() => startSession(selectedExercise)} onDeleteEntry={id => { if (user.uid !== 'local' && window.firebase) { const db = firebase.firestore(); const aid = typeof __app_id !== "undefined" ? __app_id : "iron-track-app"; db.collection(`/artifacts/${aid}/users/${user.uid}/history`).doc(id).delete(); } else { const updated = history.filter(h => h.id !== id); setHistory(updated); localStorage.setItem("fitness_history", JSON.stringify(updated)); } }} onEditEntry={entry => { setEditingHistoryEntryId(entry.id); setSets(entry.sets.map(s => ({ ...s, _id: generateId(), status: s.type==='set' ? 'done' : 'empty' }))); setView("log"); }} />}
+            {view === "history" && <DetailView exercise={selectedExercise} history={history} onBack={() => setView("list")} onStartLog={() => startSession(selectedExercise)} onDeleteEntry={id => { if (user.uid !== 'local' && window.firebase) { const db = firebase.firestore(); const aid = typeof __app_id !== "undefined" ? __app_id : "iron-track-app"; db.collection(`/artifacts/${aid}/users/${user.uid}/history`).doc(id).delete(); } else { const updated = history.filter(h => h.id !== id); setHistory(updated); try { localStorage.setItem("fitness_history", JSON.stringify(updated)); } catch (e) {} } }} onEditEntry={entry => { setEditingHistoryEntryId(entry.id); setSets(entry.sets.map(s => ({ ...s, _id: generateId(), status: s.type==='set' ? 'done' : 'empty' }))); setView("log"); }} />}
             {view === "log" && <LogView exercise={selectedExercise} sets={sets} existingEntry={editingHistoryEntryId} isSaving={isSaving} onBack={() => setView("list")} onSave={handleSaveWorkout} onUpdateSet={(i, f, v) => { const n = [...sets]; n[i][f] = v; setSets(n); }} onToggleSet={i => { 
                 const n = [...sets]; 
                 const isDone = n[i].status !== 'done'; 
