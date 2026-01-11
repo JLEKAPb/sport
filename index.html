@@ -82,7 +82,7 @@
       .swipe-item-container {
         position: relative;
         overflow: hidden;
-        border-radius: 1rem;
+        /* border-radius removed to be handled by Tailwind classes */
         background-color: var(--bg-main);
         touch-action: pan-y;
         view-transition-name: var(--vt-name);
@@ -221,7 +221,6 @@
             osc.frequency.setValueAtTime(440, ctx.currentTime);
             gain.gain.setValueAtTime(0, ctx.currentTime);
             gain.gain.linearRampToValueAtTime(0.05, ctx.currentTime + 0.05);
-            gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.2);
             gain.gain.linearRampToValueAtTime(0.05, ctx.currentTime + 0.25);
             gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.5);
             osc.start(ctx.currentTime);
@@ -335,7 +334,7 @@
         }, [history, filterFn]);
 
         if (data.length < 2) return (
-            <div className="h-32 flex items-center justify-center bg-[var(--bg-card)] rounded-3xl border border-[var(--border-color)] mb-6">
+            <div className="h-32 flex items-center justify-center bg-[var(--bg-card)] rounded-none border-b border-[var(--border-color)] mb-0">
                 <div className="text-center">
                     <div className="flex items-center justify-center gap-2 mb-1">
                       <span className="text-[15px] text-[var(--text-muted)] font-black uppercase tracking-widest">{title}</span>
@@ -365,7 +364,7 @@
         }).join(' ');
 
         return (
-            <div className="bg-[var(--bg-card)] p-5 rounded-3xl border border-[var(--border-color)] mb-6 shadow-2xl relative overflow-hidden">
+            <div className="bg-[var(--bg-card)] p-5 rounded-none border-b border-[var(--border-color)] mb-0 shadow-none relative overflow-hidden">
                 <div className="flex justify-between items-start mb-2">
                   <div>
                     <div className="flex items-center gap-2 mb-1">
@@ -397,7 +396,7 @@
         );
       };
 
-      const SwipableItem = ({ children, onDelete, onEdit, id, bgClass = "bg-[var(--bg-card)]", style }) => {
+      const SwipableItem = ({ children, onDelete, onEdit, id, bgClass = "bg-[var(--bg-card)]", style, compact = false }) => {
         const [swipeOffset, setSwipeOffset] = useState(0);
         const startX = useRef(0);
         const startOffset = useRef(0); 
@@ -462,7 +461,7 @@
         };
 
         return (
-          <div className="swipe-item-container mb-2" style={style}>
+          <div className={`swipe-item-container ${compact ? 'mb-0 rounded-none border-b border-[var(--border-color)]' : 'mb-2 rounded-2xl'}`} style={style}>
             <div 
               className={`swipe-action-bg-right transition-opacity ${swipeOffset < 0 ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'}`} 
               onClick={handleDeleteClick}
@@ -481,7 +480,7 @@
                 <span className="text-[9px]">Изменить</span>
               </div>
             </div>
-            <div className={`swipe-content rounded-2xl ${bgClass}`} style={{ transform: `translateX(${swipeOffset}px)` }} 
+            <div className={`swipe-content ${compact ? 'rounded-none' : 'rounded-2xl'} ${bgClass}`} style={{ transform: `translateX(${swipeOffset}px)` }} 
                  onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}>
               {children}
             </div>
@@ -533,8 +532,8 @@
                 }
 
                 return (
-                  <SwipableItem key={ex.id} id={ex.id} onDelete={onDeleteExercise} onEdit={() => onEditExercise(ex)} bgClass="bg-[var(--bg-card-sec)]" style={{ "--vt-name": `item-${ex.id}` }}>
-                    <div className="flex items-center py-4 px-3 active:bg-black/5 transition-colors rounded-2xl border border-[var(--border-color)]">
+                  <SwipableItem key={ex.id} id={ex.id} onDelete={onDeleteExercise} onEdit={() => onEditExercise(ex)} bgClass="bg-[var(--bg-card-sec)]" style={{ "--vt-name": `item-${ex.id}` }} compact={true}>
+                    <div className="flex items-center py-4 px-3 active:bg-black/5 transition-colors rounded-none border-b border-[var(--border-color)]">
                       
                       <div onClick={() => onSelectHistory(ex)} className={`w-14 h-14 rounded-2xl flex items-center justify-center mr-4 bg-gradient-to-br ${ex.bg || 'from-gray-800 to-black'} shadow-lg cursor-pointer flex-shrink-0`}>
                         <Icon name={ex.icon || "Dumbbell"} size={26} />
@@ -605,13 +604,13 @@
             <div className="flex-1 overflow-y-auto p-4 pb-10">
               <VolumeChart history={exHistory} title="Силовая" subtitle="< 8 повт." filterFn={r => r < 8} />
               <VolumeChart history={exHistory} title="Обьем" subtitle="≥ 8 повт." filterFn={r => r >= 8} />
-              <h3 className="text-[10px] font-black text-gray-500 uppercase px-1 mb-5 tracking-[0.2em]">История</h3>
+              <h3 className="text-2xl font-black text-gray-500 uppercase px-1 mb-5 tracking-[0.2em]">История</h3>
               {exHistory.length === 0 ? (
                 <div className="text-center py-20 text-gray-500 font-black uppercase text-xs tracking-widest">Пусто</div>
               ) : (
                 exHistory.map((item) => (
-                  <SwipableItem key={item.id} id={item.id} onDelete={onDeleteEntry} onEdit={() => onEditEntry(item)} bgClass="bg-[var(--bg-card-sec)]">
-                    <div className="p-5 border border-[var(--border-color)] rounded-3xl">
+                  <SwipableItem key={item.id} id={item.id} onDelete={onDeleteEntry} onEdit={() => onEditEntry(item)} bgClass="bg-[var(--bg-card-sec)]" compact={true}>
+                    <div className="p-5 border-b border-[var(--border-color)] rounded-none">
                       <div className="flex justify-between items-center mb-4"><span className="font-black text-sm uppercase text-gray-400 tracking-widest">{item.dateStr}</span></div>
                       <div className="space-y-2">
                         {item.sets.filter(s=>s.type==='set').map((s, i) => (
