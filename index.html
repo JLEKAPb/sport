@@ -251,8 +251,9 @@
         const startX = useRef(0);
         const isDragging = useRef(false);
         const hasMoved = useRef(false);
+        
         const revealThreshold = 70;
-        const autoTriggerThreshold = 180;
+        const maxSwipe = 95; // Максимальное визуальное смещение
 
         const onPointerDown = (e) => {
           if (e.target.closest('.reorder-btn')) return;
@@ -269,9 +270,17 @@
             hasMoved.current = true;
             e.currentTarget.setPointerCapture(e.pointerId);
           }
+          
           if (hasMoved.current) {
-            const actualDiff = (diff > 0 && !onEdit) ? diff * 0.2 : diff;
-            setSwipeOffset(actualDiff);
+            let val = diff;
+            // Ограничиваем свайп, чтобы кнопки были видны, но не улетали бесконечно
+            if (val > 0) { // Свайп вправо (открывает Изменить слева)
+              if (!onEdit) val = val * 0.1; // Сопротивление, если редактирование не поддерживается
+              else if (val > maxSwipe) val = maxSwipe + (val - maxSwipe) * 0.15; // "Резиновый" эффект
+            } else { // Свайп влево (открывает Удалить справа)
+              if (val < -maxSwipe) val = -maxSwipe + (val + maxSwipe) * 0.15; // "Резиновый" эффект
+            }
+            setSwipeOffset(val);
           }
         };
 
@@ -280,13 +289,11 @@
           isDragging.current = false;
           e.currentTarget.releasePointerCapture(e.pointerId);
 
-          if (swipeOffset < -autoTriggerThreshold) {
-            onDelete(id);
-            setSwipeOffset(0);
-          } else if (swipeOffset < -revealThreshold) {
-            setSwipeOffset(-revealThreshold - 10);
+          // Фиксация в открытом состоянии или возврат
+          if (swipeOffset < -revealThreshold) {
+            setSwipeOffset(-85); // Фиксируем, чтобы кнопка Удалить была видна
           } else if (swipeOffset > revealThreshold && onEdit) {
-            setSwipeOffset(revealThreshold + 10);
+            setSwipeOffset(85); // Фиксируем, чтобы кнопка Изменить была видна
           } else {
             setSwipeOffset(0);
           }
@@ -340,7 +347,6 @@
           <div className="flex flex-col h-screen bg-black fade-in">
             <div className="p-6 pt-10 flex justify-between items-center bg-black sticky top-0 z-20">
               <h1 className="text-2xl font-black tracking-tight uppercase italic text-white">Iron Track</h1>
-              {/* Исправлено: фиксированный размер для квадратной кнопки */}
               <button 
                 onClick={onAddExercise} 
                 className="text-white bg-blue-600 w-12 h-12 flex items-center justify-center rounded-2xl shadow-xl active:scale-90 transition-transform flex-shrink-0"
